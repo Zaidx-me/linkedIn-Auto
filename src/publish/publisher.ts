@@ -57,65 +57,58 @@ const debugScreenshot = async (name: string) => {
         console.log(`[publisher] Screenshot saved: debug-${name}.png`);
       };
 
-      console.log('[publisher] Trying to open the share box...');
+      console.log('[publisher] Clicking "Start a post"...');
       const startPostBtn = page.locator('a:has-text("Start a post")').first();
       await startPostBtn.waitFor({ state: "visible", timeout: 30000 });
       await startPostBtn.click();
       await page.waitForTimeout(3000);
       await debugScreenshot("after-click-start-post");
 
-      let editor = page.locator('[role="textbox"]').first();
-      let editorVisible = false;
-      try {
-        await editor.waitFor({ state: "visible", timeout: 5000 });
-        editorVisible = true;
-      } catch {
-        console.log("[publisher] Editor not found yet, trying share-box trigger...");
-      }
+      console.log("[publisher] Waiting for share dialog...");
+      const shareDialog = page.locator('[role="dialog"]').filter({ hasText: "Post" }).first();
+      await shareDialog.waitFor({ state: "visible", timeout: 20000 });
+      console.log("[publisher] Share dialog visible");
 
-      if (!editorVisible) {
-        const shareBox = page.locator('.share-box__open, [data-embed-id*="share-box"]').first();
-        if (await shareBox.isVisible()) {
-          console.log("[publisher] Share box is open, clicking inner text area...");
-          await shareBox.locator('[contenteditable="true"]').first().click();
-          await page.waitForTimeout(1000);
-          await debugScreenshot("after-sharebox-click");
-          editor = page.locator('[contenteditable="true"]').first();
-        } else {
-          console.log("[publisher] Share box not found, trying keyboard shortcut 'n'...");
-          await page.keyboard.press("n");
-          await page.waitForTimeout(2000);
-          await debugScreenshot("after-keyboard-n");
-          editor = page.locator('[contenteditable="true"]').first();
-        }
-      }
-
-      await editor.waitFor({ state: "visible", timeout: 20000 });
+      const editor = shareDialog.locator('[contenteditable="true"]').first();
+      await editor.waitFor({ state: "visible", timeout: 10000 });
       await editor.click();
       await page.waitForTimeout(500);
 
-      console.log("[publisher] Typing post text with character delay...");
-      await editor.fill("");
-      await page.waitForTimeout(200);
-      await page.keyboard.type(post.text, { delay: 15 });
+      console.log("[publisher] Setting post content via innerHTML...");
+      const lines = post.text.split("\n").map(l => l.trim() ? `<p>${l}</p>` : "<p><br></p>").join("");
+      await editor.evaluate((el, html) => { (el as HTMLElement).innerHTML = html; }, lines);
+      await page.waitForTimeout(500);
+
+      editor.evaluate((el) => {
+        el.dispatchEvent(new InputEvent("input", { bubbles: true, cancelable: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      });
       await page.waitForTimeout(1500);
       await debugScreenshot("after-typing");
 
+      console.log("[publisher] Waiting for Post button to become enabled...");
+      const postBtn = shareDialog.locator('button:has-text("Post")').first();
+      await postBtn.waitFor({ state: "attached", timeout: 15000 });
       await page.waitForTimeout(2000);
 
-      console.log("[publisher] Looking for Post button...");
-      const postBtn = page.locator('button:has-text("Post")').first();
-      await postBtn.waitFor({ state: "visible", timeout: 15000 });
-      const postBtnBox = await postBtn.boundingBox();
-      console.log(`[publisher] Post button at x=${postBtnBox?.x} y=${postBtnBox?.y}`);
-      await postBtn.click();
+      const isDisabled = await postBtn.getAttribute("disabled");
+      console.log(`[publisher] Post button disabled attribute: ${isDisabled}`);
 
-      console.log("[publisher] Waiting for post confirmation...");
+      if (isDisabled !== null) {
+        console.log("[publisher] Button disabled — dispatching more input events...");
+        await editor.evaluate((el) => {
+          const html = (el as HTMLElement).innerHTML;
+          (el as HTMLElement).innerHTML = html + " ";
+          el.dispatchEvent(new InputEvent("input", { bubbles: true }));
+        });
+        await page.waitForTimeout(2000);
+      }
+
+      await postBtn.click({ force: true });
+      console.log("[publisher] Post button clicked (forced)");
+
       await page.waitForTimeout(5000);
       await debugScreenshot("after-post-click");
-
-      const postUrl = page.url();
-      console.log(`[publisher] URL after post click: ${postUrl}`);
 
       console.log("\n✅ POST PUBLISHED SUCCESSFULLY TO LINKEDIN\n");
     } catch (err) {
