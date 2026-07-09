@@ -64,8 +64,29 @@ Any NVIDIA NIM-hosted open model works. Change `NVIDIA_MODEL` in `.env`. Options
 - `meta/llama-3.3-70b-instruct`
 - `nvidia/llama-3.1-nemotron-70b-instruct` (tuned more for helpfulness/instruction following)
 
+## Autopost (browser automation)
+
+One-command flow: brainstorm → publish → done.
+
+### First-time setup
+
+```bash
+npm run auth:login
+# Browser opens. Log into LinkedIn manually, then press Enter in the terminal.
+```
+
+### Usage
+
+```bash
+npm run start -- "Setting up howdy facial recognition login on CachyOS"
+```
+
+This generates 3 post variants, picks the best via LLM, then publishes it to your LinkedIn feed automatically.
+
+### If CAPTCHA appears
+
+The tool saves a screenshot to `./data/captcha-*.png` and exits. You'll need to log in manually and re-authenticate, then re-run.
+
 ## What this doesn't do
 
-No LinkedIn publishing. No official API calls, no browser automation. This service's job
-ends at "approved post text sitting in a queue." That's intentional — publishing is a
-separate concern with separate (and messier) tradeoffs.
+No official LinkedIn API calls. No scheduling/cron (yet).
