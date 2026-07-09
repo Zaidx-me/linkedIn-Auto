@@ -6,20 +6,21 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
-    "generate:cli": "tsx src/cli.ts"
+    "generate:cli": "tsx src/cli.ts",
+    "start": "tsx src/auto.ts",
+    "auth:login": "tsx -e \"const {SessionManager} = require('./src/auth/session'); new SessionManager().loginFirstTime().then(() => process.exit(0))\""
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "playwright": "^1.48.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/express": "^4.17.21",
     "@types/node": "^20.14.15",
-    "playwright": "^1.61.1",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4"
   }
