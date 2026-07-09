@@ -107,7 +107,46 @@ async function loadPillars() {
   document.getElementById('pillar').innerHTML = pillars.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
 }
 loadPillars();
-// --- Generate (handler added inline below) ---
+// --- Generate
+document.getElementById('btn-generate').addEventListener('click', async () => {
+  const pillarId = document.getElementById('pillar').value;
+  const topic = document.getElementById('topic').value.trim();
+  const extraContext = document.getElementById('context').value.trim();
+  const variants = parseInt(document.getElementById('variants').value) || 3;
+  if (!topic || topic.length < 3) return alert('Topic must be at least 3 characters.');
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  try {
+    const data = await api('/generate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({pillarId, topic, extraContext, variants})
+    });
+    const el = document.getElementById('results');
+    el.innerHTML = '<h2 style="font-size:14px;color:var(--text-muted);margin-bottom:12px">Results</h2>' +
+      data.posts.map(p => {
+        const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
+        return `<div class="card" data-id="${p.id}">
+          <p>${p.text}</p>
+          <div class="meta">
+            <span>📏 ${p.charCount} chars</span>
+            <span>🏷️ ${hashtags}</span>
+            <span>🤖 ${p.model || '—'}</span>
+            <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
+            <span class="badge badge-pending">Pending</span>
+          </div>
+          <div class="actions">
+            <button class="btn-approve" onclick="quickApprove(${p.id}, this)">Approve</button>
+            <button class="btn-reject" onclick="quickReject(${p.id}, this)">Reject</button>
+          </div>
+        </div>`;
+      }).join('');
+  } catch (err) {
+    alert('Generate failed: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate';
+  }
+});
 </script>
 </body>
 </html>
