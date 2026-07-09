@@ -76,12 +76,12 @@ const debugScreenshot = async (name: string) => {
 
       console.log("[publisher] Setting post content via innerHTML...");
       const lines = post.text.split("\n").map(l => l.trim() ? `<p>${l}</p>` : "<p><br></p>").join("");
-      await editor.evaluate((el, html) => { (el as HTMLElement).innerHTML = html; }, lines);
+      await editor.evaluate((el: any, html: string) => { el.innerHTML = html; }, lines);
       await page.waitForTimeout(500);
 
-      editor.evaluate((el) => {
-        el.dispatchEvent(new InputEvent("input", { bubbles: true, cancelable: true }));
-        el.dispatchEvent(new Event("change", { bubbles: true }));
+      editor.evaluate((el: any) => {
+        el.dispatchEvent(new (globalThis as any).InputEvent("input", { bubbles: true, cancelable: true }));
+        el.dispatchEvent(new (globalThis as any).Event("change", { bubbles: true }));
       });
       await page.waitForTimeout(1500);
       await debugScreenshot("after-typing");
