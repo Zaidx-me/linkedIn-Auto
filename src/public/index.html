@@ -88,6 +88,7 @@ async function api(path, opts = {}) {
   if (!res.ok) { const e = await res.json().catch(() => ({error:res.statusText})); throw new Error(e.error || res.statusText); }
   return res.json();
 }
+function escapeHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // --- Navigation ---
 document.querySelectorAll('nav a').forEach(a => {
   a.addEventListener('click', e => {
@@ -124,13 +125,13 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
     });
     const el = document.getElementById('results');
     el.innerHTML = '<h2 style="font-size:14px;color:var(--text-muted);margin-bottom:12px">Results</h2>' +
-      data.posts.map(p => {
+      (data.posts || []).map(p => {
         const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
         return `<div class="card" data-id="${p.id}">
-          <p>${p.text}</p>
+          <p>${escapeHtml(p.text)}</p>
           <div class="meta">
             <span>📏 ${p.charCount} chars</span>
-            <span>🏷️ ${hashtags}</span>
+            <span>🏷️ ${escapeHtml(hashtags)}</span>
             <span>🤖 ${p.model || '—'}</span>
             <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
             <span class="badge badge-pending">Pending</span>
@@ -157,11 +158,11 @@ async function loadQueue() {
     el.innerHTML = posts.map(p => {
       const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
       return `<div class="card" data-id="${p.id}">
-        <p>${p.text}</p>
+        <p>${escapeHtml(p.text)}</p>
         <div class="meta">
           <span>📏 ${p.charCount} chars</span>
-          <span>🏷️ ${hashtags}</span>
-          <span>📂 ${p.pillarId}</span>
+          <span>🏷️ ${escapeHtml(hashtags)}</span>
+          <span>📂 ${escapeHtml(p.pillarId)}</span>
           <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
           <span class="badge badge-pending">Pending</span>
         </div>
@@ -203,13 +204,14 @@ async function loadApproved() {
     el.innerHTML = posts.map(p => {
       const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
       return `<div class="card" data-id="${p.id}">
-        <p>${p.text}</p>
+        <p>${escapeHtml(p.text)}</p>
         <div class="meta">
           <span>📏 ${p.charCount} chars</span>
-          <span>🏷️ ${hashtags}</span>
-          <span>📂 ${p.pillarId}</span>
-          <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
-          <span class="badge badge-approved">Approved</span>
+          <span>🏷️ ${escapeHtml(hashtags)}</span>
+          <span>📂 ${escapeHtml(p.pillarId)}</span>
+            <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
+            <span>✅ ${p.publishedAt ? new Date(p.publishedAt).toLocaleString() : 'Approved — no approval timestamp stored'}</span>
+            <span class="badge badge-approved">Approved</span>
         </div>
       </div>`;
     }).join('');

@@ -86,7 +86,7 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, model: NVIDIA_MODEL });
 });
 
-app.get("/", (_req: Request, res: Response) => {
+app.get("*", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
