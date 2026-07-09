@@ -52,44 +52,70 @@ export class Publisher {
       console.log("[publisher] Waiting for feed to settle...");
       await page.waitForTimeout(5000);
 
-      console.log('[publisher] Clicking "Start a post"...');
+const debugScreenshot = async (name: string) => {
+        await page.screenshot({ path: path.join(DATA_DIR, `debug-${name}.png`), fullPage: false });
+        console.log(`[publisher] Screenshot saved: debug-${name}.png`);
+      };
+
+      console.log('[publisher] Trying to open the share box...');
       const startPostBtn = page.locator('a:has-text("Start a post")').first();
       await startPostBtn.waitFor({ state: "visible", timeout: 30000 });
       await startPostBtn.click();
       await page.waitForTimeout(3000);
-      await page.screenshot({ path: path.join(DATA_DIR, "debug-after-click-start-post.png") });
-      console.log("[publisher] Screenshot saved: debug-after-click-start-post.png");
+      await debugScreenshot("after-click-start-post");
 
-      console.log("[publisher] Looking for editor...");
-      const editor = page.locator('[role="textbox"][aria-label*="Post"]').first();
-      await editor.waitFor({ state: "visible", timeout: 30000 });
+      let editor = page.locator('[role="textbox"]').first();
+      let editorVisible = false;
+      try {
+        await editor.waitFor({ state: "visible", timeout: 5000 });
+        editorVisible = true;
+      } catch {
+        console.log("[publisher] Editor not found yet, trying share-box trigger...");
+      }
+
+      if (!editorVisible) {
+        const shareBox = page.locator('.share-box__open, [data-embed-id*="share-box"]').first();
+        if (await shareBox.isVisible()) {
+          console.log("[publisher] Share box is open, clicking inner text area...");
+          await shareBox.locator('[contenteditable="true"]').first().click();
+          await page.waitForTimeout(1000);
+          await debugScreenshot("after-sharebox-click");
+          editor = page.locator('[contenteditable="true"]').first();
+        } else {
+          console.log("[publisher] Share box not found, trying keyboard shortcut 'n'...");
+          await page.keyboard.press("n");
+          await page.waitForTimeout(2000);
+          await debugScreenshot("after-keyboard-n");
+          editor = page.locator('[contenteditable="true"]').first();
+        }
+      }
+
+      await editor.waitFor({ state: "visible", timeout: 20000 });
       await editor.click();
       await page.waitForTimeout(500);
 
-      console.log("[publisher] Typing post text...");
+      console.log("[publisher] Typing post text with character delay...");
       await editor.fill("");
-      await page.keyboard.type(post.text, { delay: 10 });
-      await page.waitForTimeout(1000);
-      await page.screenshot({ path: path.join(DATA_DIR, "debug-after-typing.png") });
-      console.log("[publisher] Screenshot saved: debug-after-typing.png");
+      await page.waitForTimeout(200);
+      await page.keyboard.type(post.text, { delay: 15 });
+      await page.waitForTimeout(1500);
+      await debugScreenshot("after-typing");
 
-      console.log("[publisher] Looking for Post button...");
       await page.waitForTimeout(2000);
 
-      const postBtn = page.locator('button:has-text("Post")').last();
+      console.log("[publisher] Looking for Post button...");
+      const postBtn = page.locator('button:has-text("Post")').first();
       await postBtn.waitFor({ state: "visible", timeout: 15000 });
       const postBtnBox = await postBtn.boundingBox();
-      console.log(`[publisher] Post button found at x=${postBtnBox?.x} y=${postBtnBox?.y} w=${postBtnBox?.width} h=${postBtnBox?.height}`);
+      console.log(`[publisher] Post button at x=${postBtnBox?.x} y=${postBtnBox?.y}`);
       await postBtn.click();
 
-      console.log("[publisher] Waiting for post to go through...");
-      await page.waitForTimeout(3000);
+      console.log("[publisher] Waiting for post confirmation...");
+      await page.waitForTimeout(5000);
+      await debugScreenshot("after-post-click");
 
       const postUrl = page.url();
-      console.log(`[publisher] URL after clicking Post: ${postUrl}`);
-
-      await page.screenshot({ path: path.join(DATA_DIR, "debug-after-post.png") });
-      console.log("[publisher] Screenshot saved: debug-after-post.png");
+      console.log(`[publisher] URL after post click: ${postUrl}`);
 
       console.log("\n✅ POST PUBLISHED SUCCESSFULLY TO LINKEDIN\n");
     } catch (err) {
