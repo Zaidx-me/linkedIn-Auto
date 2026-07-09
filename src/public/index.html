@@ -193,6 +193,30 @@ async function quickReject(id, btn) {
     setTimeout(() => { card.remove(); if (!document.querySelector('#queue-list .card')) document.querySelector('#queue-list').innerHTML = '<p style="color:var(--text-muted)">No posts waiting for review.</p>'; }, 300);
   } catch (err) { alert('Reject failed: ' + err.message); }
 }
+// --- Approved ---
+async function loadApproved() {
+  const el = document.getElementById('approved-list');
+  el.innerHTML = '<p style="color:var(--text-muted)">Loading...</p>';
+  try {
+    const posts = await api('/approved');
+    if (!posts.length) { el.innerHTML = '<p style="color:var(--text-muted)">No approved posts yet.</p>'; return; }
+    el.innerHTML = posts.map(p => {
+      const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
+      return `<div class="card" data-id="${p.id}">
+        <p>${p.text}</p>
+        <div class="meta">
+          <span>📏 ${p.charCount} chars</span>
+          <span>🏷️ ${hashtags}</span>
+          <span>📂 ${p.pillarId}</span>
+          <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
+          <span class="badge badge-approved">Approved</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    el.innerHTML = `<p style="color:var(--red)">Failed to load: ${err.message}</p>`;
+  }
+}
 </script>
 </body>
 </html>
