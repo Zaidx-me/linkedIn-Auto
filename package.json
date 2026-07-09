@@ -7,9 +7,11 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "generate:cli": "tsx src/cli.ts",
-    "start": "node dist/server.js",
+    "start": "npm run build && node dist/server.js",
     "start:dev": "tsx src/server.ts",
-    "auth:login": "tsx src/auth/login.ts"
+    "start:quick": "node dist/server.js",
+    "auth:login": "tsx src/auth/login.ts",
+    "schedule": "tsx src/scheduler/scheduler.ts"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
