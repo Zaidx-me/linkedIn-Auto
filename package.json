@@ -8,7 +8,7 @@
     "build": "tsc",
     "generate:cli": "tsx src/cli.ts",
     "start": "tsx src/auto.ts",
-    "auth:login": "tsx -e \"const {SessionManager} = require('./src/auth/session'); new SessionManager().loginFirstTime().then(() => process.exit(0))\""
+    "auth:login": "tsx src/auth/instructions.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

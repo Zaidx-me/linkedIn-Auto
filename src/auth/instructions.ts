@@ -1,0 +1,11 @@
+console.log("\n  LinkedIn AutoPost — Setup Instructions\n");
+console.log("  This tool needs your LinkedIn session cookies to post on your behalf.");
+console.log("  Playwright's automated browser gets blocked by LinkedIn, so you'll");
+console.log("  export cookies from your real browser once, and the tool reuses them.\n");
+console.log("  Steps:\n");
+console.log("  1. Open Chrome/Firefox and log into linkedin.com");
+console.log("  2. Install 'Get cookies.txt LOCALLY' extension:");
+console.log("     https://chromewebstore.google.com/detail/cclelndahbckbenkjhflpdbgdldlbecc");
+console.log("  3. Go to linkedin.com, click the extension icon, export cookies");
+console.log("  4. Save the file as data/cookies.txt in this project\n");
+console.log("  5. Run: npm run start -- \"your topic here\"\n");

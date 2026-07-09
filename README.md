@@ -70,10 +70,17 @@ One-command flow: brainstorm → publish → done.
 
 ### First-time setup
 
+Playwright's automated browser gets blocked by LinkedIn. Instead, export cookies
+from your real browser once:
+
 ```bash
 npm run auth:login
-# Browser opens. Log into LinkedIn manually, then press Enter in the terminal.
+# Prints instructions on how to export cookies from your browser.
+# 1. Install "Get cookies.txt LOCALLY" Chrome extension
+# 2. Go to linkedin.com, export cookies → save as data/cookies.txt
 ```
+
+Then run the autopost command — it converts the cookie file automatically.
 
 ### Usage
 
