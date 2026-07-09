@@ -7,10 +7,14 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "generate:cli": "tsx src/cli.ts",
-    "start": "tsx src/auto.ts",
-    "auth:login": "tsx src/auth/instructions.ts"
+    "start": "node dist/server.js",
+    "start:dev": "tsx src/server.ts",
+    "auth:login": "tsx src/auth/login.ts"
   },
   "dependencies": {
+    "@inquirer/prompts": "^8.5.2",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "playwright": "^1.48.0",
