@@ -45,7 +45,7 @@ app.post("/generate", async (req: Request, res: Response) => {
       ? await generator.generateVariants({ pillarId, topic, extraContext }, variants)
       : [await generator.generate({ pillarId, topic, extraContext })];
 
-    const stored = results.map((r) => ({ id: store.save(r), ...r }));
+    const stored = results.map((r) => ({ id: store.savePost(r), ...r }));
     res.json({ posts: stored });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -84,10 +84,15 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, model: NVIDIA_MODEL });
 });
 
-app.listen(PORT, () => {
-  console.log(`linkedin-content-gen listening on http://localhost:${PORT}`);
-  console.log(`Model: ${NVIDIA_MODEL}`);
-  if (!NVIDIA_API_KEY) {
-    console.warn("WARNING: NVIDIA_API_KEY is not set — /generate will fail until you set it in .env");
-  }
-});
+async function start() {
+  await store.init();
+  app.listen(PORT, () => {
+    console.log(`linkedin-content-gen listening on http://localhost:${PORT}`);
+    console.log(`Model: ${NVIDIA_MODEL}`);
+    if (!NVIDIA_API_KEY) {
+      console.warn("WARNING: NVIDIA_API_KEY is not set — /generate will fail until you set it in .env");
+    }
+  });
+}
+
+start();

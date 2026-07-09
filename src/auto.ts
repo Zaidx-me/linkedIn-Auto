@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PostGenerator } from "./generation/postGenerator";
-import { PostStore, PostStatus } from "./storage/postStore";
+import { PostStore } from "./storage/postStore";
 import { brainstorm } from "./brainstorm";
 import { Publisher } from "./publish/publisher";
 
@@ -20,14 +20,15 @@ async function main() {
 
   const generator = new PostGenerator(NVIDIA_API_KEY, NVIDIA_MODEL);
   const store = new PostStore(DB_PATH);
+  await store.init();
 
   // Step 1: Brainstorm
   console.log("Generating variants...");
   const winner = await brainstorm(topic, generator);
 
   // Save as approved
-  const id = store.save(winner);
-  store.updateStatus(id, "approved" as PostStatus);
+  const id = store.savePost(winner);
+  store.updateStatus(id, "approved");
   console.log(`Winner saved to DB (id=${id}, status=approved)`);
 
   // Step 2: Publish
@@ -35,7 +36,7 @@ async function main() {
   const publisher = new Publisher();
   await publisher.publish(winner);
 
-  store.updateStatus(id, "published" as PostStatus);
+  store.updateStatus(id, "published");
   console.log(`Post #${id} published!`);
   console.log(`\n--- Post Preview ---`);
   console.log(winner.text);

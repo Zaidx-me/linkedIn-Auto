@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
 import path from "path";
 import fs from "fs";
 import { GeneratePostResult } from "../generation/postGenerator";
@@ -11,7 +11,7 @@ export interface StoredPost {
   topic: string;
   text: string;
   charCount: number;
-  hashtags: string; // JSON stringified array
+  hashtags: string;
   model: string;
   status: PostStatus;
   generatedAt: string;
@@ -19,21 +19,29 @@ export interface StoredPost {
 }
 
 export class PostStore {
-  private db: Database.Database;
+  private db: SqlJsDatabase | null = null;
+  private dbPath: string;
+  private nextId = 1;
 
   constructor(dbPath: string) {
-    const dir = path.dirname(dbPath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-    this.db = new Database(dbPath);
-    this.db.pragma("journal_mode = WAL");
-    this.init();
+    this.dbPath = dbPath;
   }
 
-  private init() {
-    this.db.exec(`
+  async init(): Promise<void> {
+    const dir = path.dirname(this.dbPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    const SQL = await initSqlJs();
+    if (fs.existsSync(this.dbPath)) {
+      const buffer = fs.readFileSync(this.dbPath);
+      this.db = new SQL.Database(buffer);
+    } else {
+      this.db = new SQL.Database();
+    }
+
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY,
         pillarId TEXT NOT NULL,
         topic TEXT NOT NULL,
         text TEXT NOT NULL,
@@ -45,39 +53,84 @@ export class PostStore {
         publishedAt TEXT
       );
     `);
+
+    const maxId = this.db.exec("SELECT COALESCE(MAX(id), 0) + 1 as next FROM posts");
+    if (maxId.length > 0 && maxId[0].values.length > 0) {
+      this.nextId = (maxId[0].values[0][0] as number) || 1;
+    }
+
+    this.save();
   }
 
-  save(post: GeneratePostResult): number {
+  private save() {
+    if (!this.db) return;
+    const data = this.db.export();
+    fs.writeFileSync(this.dbPath, Buffer.from(data));
+  }
+
+  savePost(post: GeneratePostResult): number {
+    if (!this.db) throw new Error("PostStore not initialized. Call init() first.");
+    const id = this.nextId++;
     const stmt = this.db.prepare(`
-      INSERT INTO posts (pillarId, topic, text, charCount, hashtags, model, status, generatedAt)
-      VALUES (@pillarId, @topic, @text, @charCount, @hashtags, @model, 'pending_review', @generatedAt)
+      INSERT INTO posts (id, pillarId, topic, text, charCount, hashtags, model, status, generatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_review', ?)
     `);
-    const info = stmt.run({
-      pillarId: post.pillarId,
-      topic: post.topic,
-      text: post.text,
-      charCount: post.charCount,
-      hashtags: JSON.stringify(post.hashtags),
-      model: post.model,
-      generatedAt: post.generatedAt,
-    });
-    return Number(info.lastInsertRowid);
+    stmt.run([
+      id,
+      post.pillarId,
+      post.topic,
+      post.text,
+      post.charCount,
+      JSON.stringify(post.hashtags),
+      post.model,
+      post.generatedAt,
+    ]);
+    stmt.free();
+    this.save();
+    return id;
   }
 
   listByStatus(status: PostStatus): StoredPost[] {
-    return this.db
-      .prepare(`SELECT * FROM posts WHERE status = ? ORDER BY generatedAt DESC`)
-      .all(status) as StoredPost[];
+    if (!this.db) throw new Error("PostStore not initialized.");
+    const stmt = this.db.prepare("SELECT * FROM posts WHERE status = ? ORDER BY generatedAt DESC");
+    stmt.bind([status]);
+    const rows: StoredPost[] = [];
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject() as unknown as StoredPost);
+    }
+    stmt.free();
+    return rows;
   }
 
   updateStatus(id: number, status: PostStatus) {
+    if (!this.db) throw new Error("PostStore not initialized.");
     const publishedAt = status === "published" ? new Date().toISOString() : null;
-    this.db
-      .prepare(`UPDATE posts SET status = ?, publishedAt = COALESCE(?, publishedAt) WHERE id = ?`)
-      .run(status, publishedAt, id);
+    this.db.run("UPDATE posts SET status = ?, publishedAt = COALESCE(?, publishedAt) WHERE id = ?", [
+      status,
+      publishedAt,
+      id,
+    ]);
+    this.save();
   }
 
   getById(id: number): StoredPost | undefined {
-    return this.db.prepare(`SELECT * FROM posts WHERE id = ?`).get(id) as StoredPost | undefined;
+    if (!this.db) throw new Error("PostStore not initialized.");
+    const stmt = this.db.prepare("SELECT * FROM posts WHERE id = ?");
+    stmt.bind([id]);
+    if (stmt.step()) {
+      const row = stmt.getAsObject() as unknown as StoredPost;
+      stmt.free();
+      return row;
+    }
+    stmt.free();
+    return undefined;
+  }
+
+  close() {
+    if (this.db) {
+      this.save();
+      this.db.close();
+      this.db = null;
+    }
   }
 }
