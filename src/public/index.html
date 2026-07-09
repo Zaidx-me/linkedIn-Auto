@@ -147,6 +147,52 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
     btn.disabled = false; btn.textContent = 'Generate';
   }
 });
+// --- Queue ---
+async function loadQueue() {
+  const el = document.getElementById('queue-list');
+  el.innerHTML = '<p style="color:var(--text-muted)">Loading...</p>';
+  try {
+    const posts = await api('/queue');
+    if (!posts.length) { el.innerHTML = '<p style="color:var(--text-muted)">No posts waiting for review.</p>'; return; }
+    el.innerHTML = posts.map(p => {
+      const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
+      return `<div class="card" data-id="${p.id}">
+        <p>${p.text}</p>
+        <div class="meta">
+          <span>📏 ${p.charCount} chars</span>
+          <span>🏷️ ${hashtags}</span>
+          <span>📂 ${p.pillarId}</span>
+          <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
+          <span class="badge badge-pending">Pending</span>
+        </div>
+        <div class="actions">
+          <button class="btn-approve" onclick="quickApprove(${p.id}, this)">Approve</button>
+          <button class="btn-reject" onclick="quickReject(${p.id}, this)">Reject</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    el.innerHTML = `<p style="color:var(--red)">Failed to load queue: ${err.message}</p>`;
+  }
+}
+
+async function quickApprove(id, btn) {
+  const card = btn.closest('.card');
+  try {
+    await api('/queue/' + id + '/approve', {method:'POST'});
+    card.style.transition = 'opacity .3s'; card.style.opacity = '0';
+    setTimeout(() => { card.remove(); if (!document.querySelector('#queue-list .card')) document.querySelector('#queue-list').innerHTML = '<p style="color:var(--text-muted)">No posts waiting for review.</p>'; }, 300);
+  } catch (err) { alert('Approve failed: ' + err.message); }
+}
+
+async function quickReject(id, btn) {
+  const card = btn.closest('.card');
+  try {
+    await api('/queue/' + id + '/reject', {method:'POST'});
+    card.style.transition = 'opacity .3s'; card.style.opacity = '0';
+    setTimeout(() => { card.remove(); if (!document.querySelector('#queue-list .card')) document.querySelector('#queue-list').innerHTML = '<p style="color:var(--text-muted)">No posts waiting for review.</p>'; }, 300);
+  } catch (err) { alert('Reject failed: ' + err.message); }
+}
 </script>
 </body>
 </html>
