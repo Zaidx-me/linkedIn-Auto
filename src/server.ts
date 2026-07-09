@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
+import path from "path";
 import { z } from "zod";
 import { PostGenerator } from "./generation/postGenerator";
 import { PostStore } from "./storage/postStore";
@@ -12,6 +13,7 @@ const DB_PATH = process.env.DB_PATH || "./data/posts.db";
 
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
 const generator = new PostGenerator(NVIDIA_API_KEY, NVIDIA_MODEL);
 const store = new PostStore(DB_PATH);
@@ -82,6 +84,10 @@ app.get("/approved", (_req: Request, res: Response) => {
 
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, model: NVIDIA_MODEL });
+});
+
+app.get("/", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 async function start() {

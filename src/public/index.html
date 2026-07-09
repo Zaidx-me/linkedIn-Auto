@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>linkedin-content-gen</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--accent:#58a6ff;--accent-hover:#79c0ff;--green:#3fb950;--red:#f85149;--yellow:#d29922}
+body{font-family:ui-monospace,'Cascadia Code','Fira Code','Consolas',monospace;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+nav{width:200px;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;flex-shrink:0;min-height:100vh}
+nav h2{padding:0 20px;font-size:14px;color:var(--text-muted);margin-bottom:20px;text-transform:uppercase;letter-spacing:.05em}
+nav a{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text-muted);text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:.15s}
+nav a:hover{color:var(--text);background:rgba(88,166,255,.06)}
+nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(88,166,255,.08)}
+main{flex:1;padding:32px 40px;overflow-y:auto}
+h1{font-size:18px;font-weight:600;margin-bottom:24px;color:var(--accent)}
+.tab{display:none}
+.tab.active{display:block}
+.form-group{margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px}
+select,input,textarea{width:100%;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:13px}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{min-height:80px;resize:vertical}
+button{padding:8px 20px;border:none;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-primary{background:var(--accent);color:#0d1117}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--text-muted)}
+.btn-approve{background:var(--green);color:#0d1117}
+.btn-approve:hover{opacity:.85}
+.btn-reject{background:var(--red);color:#fff}
+.btn-reject:hover{opacity:.85}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px}
+.card p{font-size:13px;line-height:1.6;margin-bottom:8px;white-space:pre-wrap}
+.card .meta{font-size:12px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap}
+.card .meta span{display:inline-flex;align-items:center;gap:4px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-pending{background:rgba(210,153,34,.15);color:var(--yellow)}
+.badge-approved{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-rejected{background:rgba(248,81,73,.15);color:var(--red)}
+.actions{display:flex;gap:8px;margin-top:10px}
+@media(max-width:640px){body{flex-direction:column} nav{width:100%;min-height:auto;border-right:none;border-bottom:1px solid var(--border);padding:12px 0} nav a{padding:8px 16px} main{padding:20px}}
+</style>
+</head>
+<body>
+<nav>
+  <h2>linkedin-content-gen</h2>
+  <a href="#generate" data-tab="generate" class="active">✏️ Generate</a>
+  <a href="#queue" data-tab="queue">📋 Queue</a>
+  <a href="#approved" data-tab="approved">✅ Approved</a>
+</nav>
+<main>
+  <div id="tab-generate" class="tab active">
+    <h1>Generate Post</h1>
+    <div class="form-group">
+      <label for="pillar">Content Pillar</label>
+      <select id="pillar" required></select>
+    </div>
+    <div class="form-group">
+      <label for="topic">Topic</label>
+      <input type="text" id="topic" placeholder="What's this post about?" required minlength="3">
+    </div>
+    <div class="form-group">
+      <label for="context">Extra Context <span style="color:var(--text-muted)">(optional)</span></label>
+      <textarea id="context" placeholder="Any specific details, commands, errors, or results to include..."></textarea>
+    </div>
+    <div class="form-group">
+      <label for="variants">Variants <span style="color:var(--text-muted)">(1–5)</span></label>
+      <input type="number" id="variants" value="3" min="1" max="5" style="width:80px">
+    </div>
+    <button class="btn-primary" id="btn-generate">Generate</button>
+    <div id="results" style="margin-top:24px"></div>
+  </div>
+  <div id="tab-queue" class="tab">
+    <h1>Review Queue</h1>
+    <div id="queue-list"></div>
+  </div>
+  <div id="tab-approved" class="tab">
+    <h1>Approved Posts</h1>
+    <div id="approved-list"></div>
+  </div>
+</main>
+<script>
+const API = '';
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, opts);
+  if (!res.ok) { const e = await res.json().catch(() => ({error:res.statusText})); throw new Error(e.error || res.statusText); }
+  return res.json();
+}
+// --- Navigation ---
+document.querySelectorAll('nav a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const tab = a.dataset.tab;
+    document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'queue') loadQueue();
+    if (tab === 'approved') loadApproved();
+  });
+});
+// --- Pillars ---
+async function loadPillars() {
+  const pillars = await api('/pillars');
+  document.getElementById('pillar').innerHTML = pillars.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+}
+loadPillars();
+// --- Generate (handler added inline below) ---
+</script>
+</body>
+</html>
