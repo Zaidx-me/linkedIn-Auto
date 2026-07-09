@@ -87,30 +87,67 @@ const debugScreenshot = async (name: string) => {
       await debugScreenshot("after-typing");
 
       console.log("[publisher] Waiting for Post button to become enabled...");
-      const postBtn = shareDialog.locator('button:has-text("Post")').first();
+      let postBtn = shareDialog.locator('button:has-text("Post")').first();
       await postBtn.waitFor({ state: "attached", timeout: 15000 });
-      await page.waitForTimeout(2000);
 
-      const isDisabled = await postBtn.getAttribute("disabled");
-      console.log(`[publisher] Post button disabled attribute: ${isDisabled}`);
+      let attempts = 0;
+      const maxAttempts = 3;
+      let posted = false;
 
-      if (isDisabled !== null) {
-        console.log("[publisher] Button disabled — dispatching more input events...");
-        await editor.evaluate((el) => {
-          const html = (el as HTMLElement).innerHTML;
-          (el as HTMLElement).innerHTML = html + " ";
-          el.dispatchEvent(new InputEvent("input", { bubbles: true }));
-        });
-        await page.waitForTimeout(2000);
+      while (!posted && attempts < maxAttempts) {
+        attempts++;
+        await page.waitForTimeout(1000);
+
+        const isDisabled = await postBtn.getAttribute("disabled");
+        console.log(`[publisher] Attempt ${attempts}: Post button disabled attribute = ${isDisabled}`);
+
+        if (isDisabled !== null) {
+          await editor.evaluate((el) => {
+            const html = (el as HTMLElement).innerHTML;
+            (el as HTMLElement).innerHTML = html + " \n";
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          });
+          await page.waitForTimeout(1000);
+        }
+
+        await postBtn.evaluate((btn) => (btn as HTMLButtonElement).click());
+        console.log(`[publisher] Attempt ${attempts}: clicked Post button via native DOM`);
+        await page.waitForTimeout(3000);
+
+        const dialogStillOpen = await shareDialog.isVisible().catch(() => false);
+        if (!dialogStillOpen) {
+          posted = true;
+          console.log("[publisher] Share dialog closed — post submitted successfully");
+        } else {
+          console.log(`[publisher] Dialog still open after attempt ${attempts}`);
+          postBtn = shareDialog.locator('button:has-text("Post")').first();
+        }
       }
 
-      await postBtn.click({ force: true });
-      console.log("[publisher] Post button clicked (forced)");
+      if (!posted) {
+        console.log("[publisher] Trying force-click on any Post button in page...");
+        await page.locator('button:has-text("Post")').last().click({ force: true });
+        await page.waitForTimeout(3000);
+      }
 
-      await page.waitForTimeout(5000);
       await debugScreenshot("after-post-click");
 
-      console.log("\n✅ POST PUBLISHED SUCCESSFULLY TO LINKEDIN\n");
+      let published = posted;
+      if (!published) {
+        published = !(await shareDialog.isVisible().catch(() => false));
+      }
+
+      const toasts = await page.locator('[role="alert"], [data-test-id*="toast"], .artdeco-toast-item').all().catch(() => []);
+      console.log(`[publisher] Toast messages found: ${toasts.length}`);
+      for (const t of toasts) {
+        console.log(`[publisher] Toast: ${await t.textContent().catch(() => "?")}`);
+      }
+
+      if (published) {
+        console.log("\n✅ POST PUBLISHED SUCCESSFULLY TO LINKEDIN\n");
+      } else {
+        throw new Error("Post button clicked but dialog did not close — LinkedIn may have blocked the submission");
+      }
     } catch (err) {
       try {
         await page.screenshot({ path: path.join(DATA_DIR, `debug-error-${Date.now()}.png`) });
