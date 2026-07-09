@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
 import path from "path";
+import fs from "fs";
 import { z } from "zod";
 import { PostGenerator } from "./generation/postGenerator";
 import { PostStore } from "./storage/postStore";
@@ -13,7 +14,19 @@ const DB_PATH = process.env.DB_PATH || "./data/posts.db";
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+const publicDir = fs.existsSync(path.join(__dirname, "public"))
+  ? path.join(__dirname, "public")
+  : path.join(__dirname, "..", "src", "public");
+app.use(express.static(publicDir));
+
+app.use((req: Request, _res: Response, next) => {
+  const start = Date.now();
+  _res.on("finish", () => {
+    const ms = Date.now() - start;
+    console.log(`[${req.method}] ${req.originalUrl} → ${_res.statusCode} (${ms}ms)`);
+  });
+  next();
+});
 
 const generator = new PostGenerator(NVIDIA_API_KEY, NVIDIA_MODEL);
 const store = new PostStore(DB_PATH);
@@ -43,13 +56,16 @@ app.post("/generate", async (req: Request, res: Response) => {
   const { pillarId, topic, extraContext, variants } = parsed.data;
 
   try {
+    console.log(`[generate] pillar=${pillarId} topic="${topic}" variants=${variants || 1}`);
     const results = variants
       ? await generator.generateVariants({ pillarId, topic, extraContext }, variants)
       : [await generator.generate({ pillarId, topic, extraContext })];
 
     const stored = results.map((r) => ({ id: store.savePost(r), ...r }));
+    console.log(`[generate] → ${stored.length} post(s) saved (ids: ${stored.map(s => s.id).join(",")})`);
     res.json({ posts: stored });
   } catch (err: any) {
+    console.error(`[generate] ERROR: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
@@ -65,6 +81,7 @@ app.post("/queue/:id/approve", (req: Request, res: Response) => {
   const post = store.getById(id);
   if (!post) return res.status(404).json({ error: "Post not found" });
   store.updateStatus(id, "approved");
+  console.log(`[approve] post #${id} — "${post.topic}"`);
   res.json({ ok: true, id, status: "approved" });
 });
 
@@ -74,6 +91,7 @@ app.post("/queue/:id/reject", (req: Request, res: Response) => {
   const post = store.getById(id);
   if (!post) return res.status(404).json({ error: "Post not found" });
   store.updateStatus(id, "rejected");
+  console.log(`[reject] post #${id} — "${post.topic}"`);
   res.json({ ok: true, id, status: "rejected" });
 });
 
@@ -87,17 +105,18 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 app.get("*", (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(path.join(publicDir, "index.html"));
 });
 
 async function start() {
   await store.init();
   app.listen(PORT, () => {
-    console.log(`linkedin-content-gen listening on http://localhost:${PORT}`);
-    console.log(`Model: ${NVIDIA_MODEL}`);
+    console.log(`\n  🚀  linkedin-content-gen ready at http://localhost:${PORT}`);
+    console.log(`  🤖  Model: ${NVIDIA_MODEL}`);
     if (!NVIDIA_API_KEY) {
-      console.warn("WARNING: NVIDIA_API_KEY is not set — /generate will fail until you set it in .env");
+      console.warn("\n  ⚠️  NVIDIA_API_KEY is not set — /generate will fail until you set it in .env\n");
     }
+    console.log("  ─────────────────────────────────────────────\n");
   });
 }
 
