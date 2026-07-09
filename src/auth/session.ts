@@ -6,6 +6,7 @@ import { CaptchaBlockedError } from "./captchaError";
 const SESSION_PATH = path.resolve(__dirname, "../../data/session.json");
 const COOKIE_CHECK_URL = "https://www.linkedin.com/feed";
 const CAPTCHA_DIR = path.resolve(__dirname, "../../data");
+const ESSENTIAL_COOKIES = ["li_at", "JSESSIONID"];
 
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
@@ -46,18 +47,27 @@ export class SessionManager {
         name,
         value,
         domain,
-        path,
+        path: path || "/",
         expires: parseInt(expires) || -1,
-        httpOnly: false,
+        httpOnly: true,
         secure: secure === "TRUE",
         sameSite: "None",
       });
     }
 
     if (cookies.length > 0) {
+      const names = cookies.map((c: any) => c.name);
+      const missing = ESSENTIAL_COOKIES.filter((e) => !names.includes(e));
       fs.writeFileSync(SESSION_PATH, JSON.stringify({ cookies: cookies, origins: [] }, null, 2));
       console.log(`Converted ${cookies.length} cookies from cookies.txt to Playwright storageState.`);
+      if (missing.length > 0) {
+        console.warn(`  Missing essential cookies: ${missing.join(", ")}. Login will likely fail.`);
+      }
     }
+  }
+
+  private async addStealth(context: any) {
+    await context.addInitScript("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });");
   }
 
   async ensureSession(): Promise<string> {
@@ -74,12 +84,22 @@ export class SessionManager {
 
     let browser;
     try {
-      browser = await chromium.launch({ headless: true });
+      browser = await chromium.launch({
+        headless: true,
+        args: [
+          "--disable-blink-features=AutomationControlled",
+          "--no-sandbox",
+          "--disable-web-security",
+        ],
+      });
       const context = await browser.newContext({
         ...this.contextOptions(),
         storageState: SESSION_PATH,
       });
+      await this.addStealth(context);
       const page = await context.newPage();
+      // Visit root first so cookies are established, then go to feed
+      await page.goto("https://www.linkedin.com", { waitUntil: "domcontentloaded", timeout: 15000 });
       await page.goto(COOKIE_CHECK_URL, { waitUntil: "networkidle", timeout: 15000 });
       const url = page.url();
       if (url.includes("/login") || url.includes("authwall")) {
