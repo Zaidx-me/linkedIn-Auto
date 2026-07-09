@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import path from "path";
 import fs from "fs";
+import { CaptchaBlockedError } from "./captchaError";
 
 const SESSION_PATH = path.resolve(__dirname, "../../data/session.json");
 const COOKIE_CHECK_URL = "https://www.linkedin.com/feed";
@@ -32,21 +33,35 @@ export class SessionManager {
       await this.loginFirstTime();
       return SESSION_PATH;
     }
-    const browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ storageState: SESSION_PATH });
-    const page = await context.newPage();
+    let browser;
     try {
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({ storageState: SESSION_PATH });
+      const page = await context.newPage();
       await page.goto(COOKIE_CHECK_URL, { waitUntil: "networkidle", timeout: 15000 });
-      if (page.url().includes("/login") || page.url().includes("authwall")) {
+      const url = page.url();
+      if (url.includes("/login") || url.includes("authwall")) {
         throw new Error("Session expired");
       }
-    } catch {
+      if (url.includes("checkpoint") || url.includes("challenge")) {
+        const screenshotPath = `./data/captcha-${Date.now()}.png`;
+        await page.screenshot({ path: screenshotPath });
+        throw new CaptchaBlockedError(screenshotPath);
+      }
+      const captchaEl = await page.$('[data-test-id="captcha"], #captcha-internal');
+      if (captchaEl) {
+        const screenshotPath = `./data/captcha-${Date.now()}.png`;
+        await page.screenshot({ path: screenshotPath });
+        throw new CaptchaBlockedError(screenshotPath);
+      }
+    } catch (err) {
+      if (browser) await browser.close();
+      if (err instanceof CaptchaBlockedError) throw err;
       console.log("Session expired or invalid. Re-login required.");
-      await browser.close();
       await this.loginFirstTime();
       return SESSION_PATH;
     }
-    await browser.close();
+    await browser!.close();
     return SESSION_PATH;
   }
 }
