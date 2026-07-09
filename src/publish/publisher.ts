@@ -86,33 +86,40 @@ const debugScreenshot = async (name: string) => {
       await page.waitForTimeout(1500);
       await debugScreenshot("after-typing");
 
-      console.log("[publisher] Waiting for Post button to become enabled...");
-      let postBtn = shareDialog.locator('button:has-text("Post")').first();
-      await postBtn.waitFor({ state: "attached", timeout: 15000 });
+      console.log("[publisher] Debug: all buttons in dialog:");
+      const allBtns = await shareDialog.locator("button").all();
+      for (const b of allBtns) {
+        const txt = await b.textContent().catch(() => "?");
+        const aria = await b.getAttribute("aria-label").catch(() => "");
+        const type = await b.getAttribute("type").catch(() => "");
+        const cls = await b.getAttribute("class").catch(() => "");
+        console.log(`  button text="${txt?.trim()}" aria="${aria}" type="${type}" class=${cls?.substring(0,40)}`);
+      }
+
+      console.log("[publisher] Looking for submit Post button...");
+      let postBtn = shareDialog.locator('button[type="submit"]').first();
+      let btnExists = await postBtn.count();
+      if (btnExists === 0) {
+        console.log("[publisher] No button[type=submit], trying last button in dialog footer...");
+        postBtn = shareDialog.locator("footer button, .share-creation-state__footer button").last();
+        btnExists = await postBtn.count();
+      }
+      if (btnExists === 0) {
+        console.log("[publisher] Still no match, using fallback: last button in dialog...");
+        postBtn = shareDialog.locator("button").last();
+      }
+      console.log(`[publisher] Selected button text: "${await postBtn.textContent().catch(() => "?")}"`);
 
       let attempts = 0;
-      const maxAttempts = 3;
       let posted = false;
 
-      while (!posted && attempts < maxAttempts) {
+      while (!posted && attempts < 3) {
         attempts++;
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1500);
 
-        const isDisabled = await postBtn.getAttribute("disabled");
-        console.log(`[publisher] Attempt ${attempts}: Post button disabled attribute = ${isDisabled}`);
-
-        if (isDisabled !== null) {
-          await editor.evaluate((el) => {
-            const html = (el as HTMLElement).innerHTML;
-            (el as HTMLElement).innerHTML = html + " \n";
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-          });
-          await page.waitForTimeout(1000);
-        }
-
-        await postBtn.evaluate((btn) => (btn as HTMLButtonElement).click());
-        console.log(`[publisher] Attempt ${attempts}: clicked Post button via native DOM`);
-        await page.waitForTimeout(3000);
+        await postBtn.click({ timeout: 5000 }).catch(() => {});
+        console.log(`[publisher] Attempt ${attempts}: clicked Post button`);
+        await page.waitForTimeout(4000);
 
         const dialogStillOpen = await shareDialog.isVisible().catch(() => false);
         if (!dialogStillOpen) {
@@ -120,7 +127,7 @@ const debugScreenshot = async (name: string) => {
           console.log("[publisher] Share dialog closed — post submitted successfully");
         } else {
           console.log(`[publisher] Dialog still open after attempt ${attempts}`);
-          postBtn = shareDialog.locator('button:has-text("Post")').first();
+          postBtn = shareDialog.locator("button").last();
         }
       }
 
