@@ -60,6 +60,14 @@ export class PostGenerator {
     };
   }
 
+  /** Raw chat access so consumers can ask the LLM to pick a winner, etc. */
+  async chat(
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    options?: { temperature?: number }
+  ): Promise<string> {
+    return this.client.chat(messages, options);
+  }
+
   /** Generate multiple variants of the same topic so you can pick the best one. */
   async generateVariants(req: GeneratePostRequest, count: number): Promise<GeneratePostResult[]> {
     const results: GeneratePostResult[] = [];
