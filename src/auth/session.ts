@@ -8,7 +8,6 @@ const DATA_DIR = path.resolve(process.cwd(), "data");
 const PROFILE_DIR = path.resolve(DATA_DIR, "chrome_profile");
 const COOKIE_CHECK_URL = "https://www.linkedin.com/feed";
 
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/usr/bin/chromium";
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
@@ -27,7 +26,6 @@ export class SessionManager {
     console.log("  Log into LinkedIn in the browser window, then come back here.\n");
 
     const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-      executablePath: CHROMIUM_PATH,
       headless: false,
       userAgent: USER_AGENT,
       viewport: { width: 1920, height: 1080 },
@@ -60,7 +58,6 @@ export class SessionManager {
   private async sessionValid(): Promise<boolean> {
     try {
       const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-  executablePath: CHROMIUM_PATH,
         headless: true, userAgent: USER_AGENT, viewport: { width: 1920, height: 1080 },
         args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
       });
@@ -81,7 +78,6 @@ export class SessionManager {
     let context;
     try {
       context = await chromium.launchPersistentContext(PROFILE_DIR, {
-  executablePath: CHROMIUM_PATH,
         headless: true,
         userAgent: USER_AGENT,
         viewport: { width: 1920, height: 1080 },

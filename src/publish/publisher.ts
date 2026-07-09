@@ -7,16 +7,12 @@ import { CaptchaBlockedError } from "../auth/captchaError";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const PROFILE_DIR = path.resolve(DATA_DIR, "chrome_profile");
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/usr/bin/chromium";
 
 export class Publisher {
   private session: SessionManager;
 
   constructor() {
     this.session = new SessionManager();
-    if (!fs.existsSync(CHROMIUM_PATH)) {
-      console.warn(`[publisher] WARNING: Chromium not found at ${CHROMIUM_PATH}. Set CHROMIUM_PATH in .env or ensure it's installed.`);
-    }
   }
 
   async publish(post: GeneratePostResult): Promise<void> {
@@ -25,7 +21,6 @@ export class Publisher {
 
     console.log("[publisher] Launching browser...");
     const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-      executablePath: CHROMIUM_PATH,
       headless: false,
       userAgent:
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
