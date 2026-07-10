@@ -74,15 +74,29 @@ export class SessionManager {
       console.log("    Password entered");
 
       console.log("    Submitting...");
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
       await page.evaluate(() => {
-        const form = document.querySelector("form");
-        if (form) {
-          form.requestSubmit();
-        } else {
-          (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
-        }
+        const pw = document.querySelector<HTMLElement>('input[type="password"]');
+        pw?.focus();
       });
+      await page.waitForTimeout(500);
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(3000);
+
+      const urlAfterSubmit = page.url();
+      console.log("    URL after submit:", urlAfterSubmit);
+
+      if (urlAfterSubmit.includes("/login")) {
+        console.log("    Enter didn't work, trying button click...");
+        await page.evaluate(() => {
+          const btn = document.querySelector<HTMLElement>(
+            'button[type="submit"], .sign-in-form__submit-button, button[aria-label="Sign in"]'
+          );
+          btn?.click();
+        });
+        await page.waitForTimeout(3000);
+        console.log("    URL after button click:", page.url());
+      }
       await page.waitForTimeout(6000);
       const afterUrl = page.url();
       console.log("    After login URL:", afterUrl);
