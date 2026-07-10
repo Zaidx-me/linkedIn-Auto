@@ -75,10 +75,11 @@ export class SessionManager {
         btn?.click();
       });
       await page.waitForTimeout(8000);
-      await page.screenshot({ path: path.join(DATA_DIR, "debug-login-filled.png") });
+      const afterUrl = page.url();
+      console.log("    After login URL:", afterUrl);
+      await page.screenshot({ path: path.join(DATA_DIR, "debug-after-login.png") });
 
-      const url = page.url();
-      if (url.includes("checkpoint") || url.includes("challenge")) {
+      if (afterUrl.includes("checkpoint") || afterUrl.includes("challenge")) {
         console.log("  LinkedIn requires verification. Complete it in the browser window,");
         console.log("  then press Enter here to continue.\n");
         const readline = (await import("readline")).default;
