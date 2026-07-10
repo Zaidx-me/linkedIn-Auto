@@ -144,23 +144,16 @@ export class SessionManager {
         console.log("  PASSWORD DEBUG:", JSON.stringify(password), `len=${password.length}`);
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        await page.evaluate((val) => {
-          const el = document.querySelector<HTMLInputElement>('input[autocomplete="username"]');
-          if (!el) return;
-          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-        }, email);
-        await page.evaluate((val) => {
-          const el = document.querySelector<HTMLInputElement>('input[type="password"]');
-          if (!el) return;
-          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-        }, password);
-        await page.evaluate(() => {
-          const form = document.querySelector("form");
-          if (form) form.requestSubmit();
-          else (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
-        });
+        const emailField = page.locator('input[type="email"]').first();
+        await emailField.waitFor({ state: "attached", timeout: 10000 });
+        await emailField.evaluate((el: any) => el.click());
+        await emailField.fill(email, { force: true });
+        const pwField = page.locator('input[type="password"]').first();
+        await pwField.waitFor({ state: "attached", timeout: 5000 });
+        await pwField.evaluate((el: any) => el.click());
+        await pwField.fill(password, { force: true });
+        await page.waitForTimeout(500);
+        await page.locator('button:has-text("Sign in")').first().evaluate((el: any) => el.click());
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
