@@ -54,23 +54,29 @@ export class SessionManager {
       await page.waitForTimeout(3000);
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
 
+      console.log("    Revealing hidden inputs...");
+      await page.evaluate(() => {
+        document.querySelectorAll<HTMLElement>('input[type="email"], input[type="password"]').forEach(el => {
+          el.style.display = "block";
+          el.style.visibility = "visible";
+          el.style.opacity = "1";
+          el.style.height = "auto";
+          el.style.width = "auto";
+          el.style.position = "static";
+        });
+      });
+      await page.waitForTimeout(500);
+
       console.log("    Typing email...");
-      const emailField = page.locator('input[type="email"]').first();
-      await emailField.waitFor({ state: "attached", timeout: 10000 });
-      await emailField.evaluate((el: any) => el.click());
-      await emailField.fill(email, { force: true });
+      await page.locator('input[type="email"]').first().fill(email);
       console.log("    Email entered");
 
       console.log("    Typing password...");
-      const pwField = page.locator('input[type="password"]').first();
-      await pwField.waitFor({ state: "attached", timeout: 5000 });
-      await pwField.evaluate((el: any) => el.click());
-      await pwField.fill(password, { force: true });
+      await page.locator('input[type="password"]').first().fill(password);
       console.log("    Password entered");
 
       console.log("    Submitting...");
-      await page.waitForTimeout(1000);
-      await page.getByRole("button", { name: "Sign in", exact: true }).first().evaluate((el: any) => el.click());
+      await page.keyboard.press("Enter");
       await page.waitForTimeout(5000);
       console.log("    URL after submit:", page.url());
       await page.waitForTimeout(6000);
