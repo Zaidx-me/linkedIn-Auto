@@ -16,8 +16,8 @@ export class Publisher {
   }
 
   async publish(post: GeneratePostResult): Promise<void> {
-    console.log("[publisher] Ensuring session...");
-    await this.session.ensureSession();
+    console.log("[publisher] Validating session...");
+    await this.session.validateSession();
 
     console.log("[publisher] Launching browser...");
     const context = await chromium.launchPersistentContext(PROFILE_DIR, {
