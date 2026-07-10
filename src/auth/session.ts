@@ -57,11 +57,15 @@ export class SessionManager {
 
       const url = page.url();
       if (url.includes("checkpoint") || url.includes("challenge")) {
-        const screenshotPath = path.join(DATA_DIR, `challenge-${Date.now()}.png`);
-        await page.screenshot({ path: screenshotPath });
-        throw new CaptchaBlockedError(screenshotPath);
+        console.log("  LinkedIn requires verification. Complete it in the browser window,");
+        console.log("  then press Enter here to continue.\n");
+        const readline = (await import("readline")).default;
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        await new Promise<void>((resolve) => rl.question("    Press Enter after verification... ", () => resolve()));
+        rl.close();
+        await page.waitForTimeout(3000);
       }
-      if (url.includes("/login") || url.includes("authwall")) {
+      if (page.url().includes("/login") || page.url().includes("authwall")) {
         throw new Error("Login failed — check LINKEDIN_EMAIL and LINKEDIN_PASSWORD");
       }
     } finally {
