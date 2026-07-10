@@ -70,7 +70,7 @@ export class SessionManager {
 
       console.log("    Submitting...");
       await page.waitForTimeout(1000);
-      await page.locator('button:has-text("Sign in")').first().evaluate((el: any) => el.click());
+      await page.getByRole("button", { name: "Sign in", exact: true }).first().evaluate((el: any) => el.click());
       await page.waitForTimeout(5000);
       console.log("    URL after submit:", page.url());
       await page.waitForTimeout(6000);
@@ -153,7 +153,7 @@ export class SessionManager {
         await pwField.evaluate((el: any) => el.click());
         await pwField.fill(password, { force: true });
         await page.waitForTimeout(500);
-        await page.locator('button:has-text("Sign in")').first().evaluate((el: any) => el.click());
+      await page.getByRole("button", { name: "Sign in", exact: true }).first().evaluate((el: any) => el.click());
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
