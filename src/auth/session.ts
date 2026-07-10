@@ -50,10 +50,14 @@ export class SessionManager {
       await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
       await page.waitForTimeout(2000);
 
-      await page.fill("#username", email);
-      await page.fill("#password", password);
+      await page.waitForTimeout(1000);
+      await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
+      console.log("    Filling in credentials...");
+      await page.fill("#session_key", email);
+      await page.fill("#session_password", password);
+      await page.screenshot({ path: path.join(DATA_DIR, "debug-login-filled.png") });
       await page.click('button[type="submit"]');
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(8000);
 
       const url = page.url();
       if (url.includes("checkpoint") || url.includes("challenge")) {
@@ -114,10 +118,10 @@ export class SessionManager {
         console.log("[publisher] Session expired, logging in with credentials...");
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        await page.fill("#username", email);
-        await page.fill("#password", password);
+        await page.fill("#session_key", email);
+        await page.fill("#session_password", password);
         await page.click('button[type="submit"]');
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
         if (afterLogin.includes("checkpoint") || afterLogin.includes("challenge")) {
