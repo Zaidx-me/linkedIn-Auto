@@ -54,31 +54,42 @@ export class SessionManager {
       await page.waitForTimeout(3000);
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
 
-      console.log("    Revealing hidden inputs...");
-      await page.evaluate(() => {
-        document.querySelectorAll<HTMLElement>('input[type="email"], input[type="password"]').forEach(el => {
-          el.style.display = "block";
-          el.style.visibility = "visible";
-          el.style.opacity = "1";
-          el.style.height = "auto";
-          el.style.width = "auto";
-          el.style.position = "static";
-        });
-      });
-      await page.waitForTimeout(500);
-
-      console.log("    Typing email...");
-      await page.locator('input[type="email"]').first().fill(email);
+      console.log("    Setting email...");
+      await page.evaluate((val) => {
+        const el = document.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+        if (!el) return;
+        el.focus();
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+        setter?.call(el, val);
+        el.dispatchEvent(new InputEvent("input", { inputType: "insertText", data: val, bubbles: true, cancelable: true }));
+      }, email);
       console.log("    Email entered");
 
-      console.log("    Typing password...");
-      await page.locator('input[type="password"]').first().fill(password);
+      console.log("    Setting password...");
+      await page.evaluate((val) => {
+        const el = document.querySelector<HTMLInputElement>('input[type="password"]');
+        if (!el) return;
+        el.focus();
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+        setter?.call(el, val);
+        el.dispatchEvent(new InputEvent("input", { inputType: "insertText", data: val, bubbles: true, cancelable: true }));
+      }, password);
       console.log("    Password entered");
 
-      console.log("    Submitting...");
+      await page.waitForTimeout(1000);
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(5000);
-      console.log("    URL after submit:", page.url());
+      await page.waitForTimeout(3000);
+      console.log("    URL after Enter:", page.url());
+
+      if (page.url().includes("/login")) {
+        await page.evaluate(() => {
+          const form = document.querySelector("form");
+          if (form) form.requestSubmit();
+          else document.querySelector<HTMLElement>('button[type="submit"]')?.click();
+        });
+        await page.waitForTimeout(3000);
+        console.log("    URL after fallback submit:", page.url());
+      }
       await page.waitForTimeout(6000);
       const afterUrl = page.url();
       console.log("    After login URL:", afterUrl);
@@ -150,18 +161,23 @@ export class SessionManager {
         console.log("  PASSWORD DEBUG:", JSON.stringify(password), `len=${password.length}`);
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
+        await page.evaluate((val) => {
+          const el = document.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+          if (!el) return;
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        }, email);
+        await page.evaluate((val) => {
+          const el = document.querySelector<HTMLInputElement>('input[type="password"]');
+          if (!el) return;
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        }, password);
         await page.evaluate(() => {
-          document.querySelectorAll<HTMLElement>('input[type="email"], input[type="password"]').forEach(el => {
-            el.style.display = "block";
-            el.style.visibility = "visible";
-            el.style.opacity = "1";
-          });
+          const form = document.querySelector("form");
+          if (form) form.requestSubmit();
+          else (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
         });
-        await page.waitForTimeout(300);
-        await page.locator('input[type="email"]').first().fill(email);
-        await page.locator('input[type="password"]').first().fill(password);
-        await page.waitForTimeout(500);
-        await page.keyboard.press("Enter");
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
