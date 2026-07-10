@@ -38,7 +38,6 @@ export class SessionManager {
 
   private async loginWithCredentials(email: string, password: string): Promise<void> {
     console.log("  Logging in to LinkedIn...");
-    console.log("  PASSWORD DEBUG:", JSON.stringify(password), `len=${password.length}`);
     const context = await chromium.launchPersistentContext(PROFILE_DIR, {
       headless: false,
       userAgent: USER_AGENT,
@@ -158,7 +157,6 @@ export class SessionManager {
       if (url.includes("/login") || url.includes("authwall")) {
         const { email, password } = getCredentials();
         console.log("[publisher] Session expired, logging in with credentials...");
-        console.log("  PASSWORD DEBUG:", JSON.stringify(password), `len=${password.length}`);
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
         await page.evaluate((val) => {
