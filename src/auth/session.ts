@@ -48,15 +48,26 @@ export class SessionManager {
 
     try {
       await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
-      await page.waitForTimeout(2000);
+      console.log("    Page loaded:", await page.title());
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(3000);
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
-      console.log("    Filling in credentials...");
-      await page.fill("#session_key", email);
-      await page.fill("#session_password", password);
+
+      console.log("    Looking for email field...");
+      const emailField = page.locator('input[name="session_key"], #session_key, input[autocomplete="username"]').first();
+      await emailField.waitFor({ state: "visible", timeout: 10000 });
+      await emailField.click();
+      await emailField.fill(email);
+      console.log("    Email entered");
+
+      const pwField = page.locator('input[name="session_password"], #session_password, input[type="password"]').first();
+      await pwField.waitFor({ state: "visible", timeout: 5000 });
+      await pwField.click();
+      await pwField.fill(password);
+      console.log("    Password entered");
+
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-filled.png") });
-      await page.click('button[type="submit"]');
+      await page.locator('button[type="submit"]').first().click();
       await page.waitForTimeout(8000);
 
       const url = page.url();
@@ -118,9 +129,9 @@ export class SessionManager {
         console.log("[publisher] Session expired, logging in with credentials...");
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        await page.fill("#session_key", email);
-        await page.fill("#session_password", password);
-        await page.click('button[type="submit"]');
+        await page.locator('input[name="session_key"], #session_key').first().fill(email);
+        await page.locator('input[name="session_password"], #session_password').first().fill(password);
+        await page.locator('button[type="submit"]').first().click();
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
