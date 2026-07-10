@@ -54,15 +54,27 @@ export class SessionManager {
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
 
       console.log("    Typing email...");
-      await page.getByRole("textbox", { name: "Email or phone" }).first().pressSequentially(email, { delay: 40 });
+      await page.evaluate((val) => {
+        const el = document.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+        if (!el) return;
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }, email);
       console.log("    Email entered");
 
       console.log("    Typing password...");
-      await page.getByRole("textbox", { name: "Password" }).pressSequentially(password, { delay: 30 });
+      await page.evaluate((val) => {
+        const el = document.querySelector<HTMLInputElement>('input[type="password"]');
+        if (!el) return;
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }, password);
       console.log("    Password entered");
 
       console.log("    Submitting...");
-      await page.getByRole("textbox", { name: "Email or phone" }).first().press("Enter");
+      await page.evaluate(() => {
+        (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
+      });
       await page.waitForTimeout(6000);
       const afterUrl = page.url();
       console.log("    After login URL:", afterUrl);
@@ -133,9 +145,21 @@ export class SessionManager {
         console.log("[publisher] Session expired, logging in with credentials...");
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        await page.getByRole("textbox", { name: "Email or phone" }).first().pressSequentially(email, { delay: 20 });
-        await page.getByRole("textbox", { name: "Password" }).pressSequentially(password, { delay: 20 });
-        await page.getByRole("textbox", { name: "Email or phone" }).first().press("Enter");
+        await page.evaluate((val) => {
+          const el = document.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+          if (!el) return;
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        }, email);
+        await page.evaluate((val) => {
+          const el = document.querySelector<HTMLInputElement>('input[type="password"]');
+          if (!el) return;
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        }, password);
+        await page.evaluate(() => {
+          (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
+        });
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
