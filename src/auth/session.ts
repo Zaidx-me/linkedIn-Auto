@@ -57,20 +57,20 @@ export class SessionManager {
       console.log("    Typing email...");
       const emailField = page.locator('input[type="email"]').first();
       await emailField.waitFor({ state: "attached", timeout: 10000 });
-      await emailField.click({ force: true });
+      await emailField.evaluate((el: any) => el.click());
       await emailField.fill(email, { force: true });
       console.log("    Email entered");
 
       console.log("    Typing password...");
       const pwField = page.locator('input[type="password"]').first();
       await pwField.waitFor({ state: "attached", timeout: 5000 });
-      await pwField.click({ force: true });
+      await pwField.evaluate((el: any) => el.click());
       await pwField.fill(password, { force: true });
       console.log("    Password entered");
 
       console.log("    Submitting...");
       await page.waitForTimeout(1000);
-      await page.locator('button:has-text("Sign in")').first().click({ force: true });
+      await page.locator('button:has-text("Sign in")').first().evaluate((el: any) => el.click());
       await page.waitForTimeout(5000);
       console.log("    URL after submit:", page.url());
       await page.waitForTimeout(6000);
