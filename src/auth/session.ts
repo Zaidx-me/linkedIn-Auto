@@ -55,59 +55,22 @@ export class SessionManager {
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
 
       console.log("    Typing email...");
-      console.log("    PASSWORD LENGTH:", password.length, "CHARS:", JSON.stringify(password));
-      await page.evaluate((val) => {
-        const el = document.querySelector<HTMLInputElement>('input[autocomplete="username"]');
-        if (!el) return;
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }, email);
+      const emailField = page.locator('input[type="email"]').first();
+      await emailField.waitFor({ state: "attached", timeout: 10000 });
+      await emailField.click({ force: true });
+      await emailField.fill(email, { force: true });
       console.log("    Email entered");
 
       console.log("    Typing password...");
-      await page.evaluate((val) => {
-        const el = document.querySelector<HTMLInputElement>('input[type="password"]');
-        if (!el) return;
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, val);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }, password);
+      const pwField = page.locator('input[type="password"]').first();
+      await pwField.waitFor({ state: "attached", timeout: 5000 });
+      await pwField.click({ force: true });
+      await pwField.fill(password, { force: true });
       console.log("    Password entered");
 
       console.log("    Submitting...");
       await page.waitForTimeout(1000);
-      const pageInfo = await page.evaluate(() => {
-        const buttons = Array.from(document.querySelectorAll("button, [role=button], a"));
-        const clickables = buttons.map(b => ({
-          tag: b.tagName,
-          type: (b as any).type || "",
-          text: (b.textContent || "").trim().slice(0, 30),
-          role: b.getAttribute("role") || "",
-          cls: (b.className || "").slice(0, 40),
-        }));
-        const inputs = Array.from(document.querySelectorAll("input")).map(i => ({
-          id: i.id,
-          type: i.type,
-          autocomplete: i.autocomplete,
-          placeholder: i.placeholder,
-          hidden: i.type === "hidden",
-        }));
-        return { clickables, inputs };
-      });
-      console.log("    Buttons found:", pageInfo.clickables.length);
-      pageInfo.clickables.forEach((b, i) => console.log(`      [${i}] <${b.tag}> type="${b.type}" text="${b.text}" role="${b.role}"`));
-      console.log("    Inputs found:", pageInfo.inputs.length);
-      pageInfo.inputs.forEach((i, idx) => console.log(`      [${idx}] id="${i.id}" type="${i.type}" auto="${i.autocomplete}" hidden=${i.hidden}`));
-
-      const signInBtn = pageInfo.clickables.find(b => /sign in/i.test(b.text));
-      if (signInBtn) {
-        console.log("    Found Sign in button! Clicking...");
-        await page.evaluate(() => {
-          const btn = Array.from(document.querySelectorAll("button, [role=button], a")).find(
-            el => /sign in/i.test(el.textContent || "")
-          ) as HTMLElement;
-          btn?.click();
-        });
-      }
+      await page.locator('button:has-text("Sign in")').first().click({ force: true });
       await page.waitForTimeout(5000);
       console.log("    URL after submit:", page.url());
       await page.waitForTimeout(6000);
