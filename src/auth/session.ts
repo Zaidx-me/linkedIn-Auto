@@ -54,16 +54,14 @@ export class SessionManager {
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
 
       console.log("    Looking for email field...");
-      const emailField = page.locator('input[name="session_key"], #session_key, input[autocomplete="username"]').first();
-      await emailField.waitFor({ state: "visible", timeout: 10000 });
-      await emailField.click();
-      await emailField.fill(email);
+      const emailField = page.locator('input[autocomplete="username"], input[name="session_key"]').first();
+      await emailField.waitFor({ state: "attached", timeout: 15000 });
+      await emailField.fill(email, { force: true });
       console.log("    Email entered");
 
-      const pwField = page.locator('input[name="session_password"], #session_password, input[type="password"]').first();
-      await pwField.waitFor({ state: "visible", timeout: 5000 });
-      await pwField.click();
-      await pwField.fill(password);
+      const pwField = page.locator('input[type="password"]').first();
+      await pwField.waitFor({ state: "attached", timeout: 5000 });
+      await pwField.fill(password, { force: true });
       console.log("    Password entered");
 
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-filled.png") });
@@ -129,8 +127,8 @@ export class SessionManager {
         console.log("[publisher] Session expired, logging in with credentials...");
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        await page.locator('input[name="session_key"], #session_key').first().fill(email);
-        await page.locator('input[name="session_password"], #session_password').first().fill(password);
+        await page.locator('input[autocomplete="username"]').first().fill(email, { force: true });
+        await page.locator('input[type="password"]').first().fill(password, { force: true });
         await page.locator('button[type="submit"]').first().click();
         await page.waitForTimeout(8000);
 
