@@ -54,19 +54,15 @@ export class SessionManager {
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
 
       console.log("    Typing email...");
-      await page.keyboard.press("Tab");
-      await page.waitForTimeout(500);
-      await page.keyboard.type(email, { delay: 40 });
+      await page.getByLabel("Email or phone").pressSequentially(email, { delay: 40 });
       console.log("    Email entered");
 
       console.log("    Typing password...");
-      await page.keyboard.press("Tab");
-      await page.waitForTimeout(500);
-      await page.keyboard.type(password, { delay: 30 });
+      await page.getByLabel("Password").pressSequentially(password, { delay: 30 });
       console.log("    Password entered");
 
       console.log("    Submitting...");
-      await page.keyboard.press("Enter");
+      await page.getByLabel("Email or phone").press("Enter");
       await page.waitForTimeout(6000);
       const afterUrl = page.url();
       console.log("    After login URL:", afterUrl);
@@ -137,13 +133,9 @@ export class SessionManager {
         console.log("[publisher] Session expired, logging in with credentials...");
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        await page.keyboard.press("Tab");
-        await page.waitForTimeout(300);
-        await page.keyboard.type(email, { delay: 20 });
-        await page.keyboard.press("Tab");
-        await page.waitForTimeout(300);
-        await page.keyboard.type(password, { delay: 20 });
-        await page.keyboard.press("Enter");
+        await page.getByLabel("Email or phone").pressSequentially(email, { delay: 20 });
+        await page.getByLabel("Password").pressSequentially(password, { delay: 20 });
+        await page.getByLabel("Email or phone").press("Enter");
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
