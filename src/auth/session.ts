@@ -74,9 +74,16 @@ export class SessionManager {
         const btn = document.querySelector<HTMLElement>('button[type="submit"], button[aria-label="Sign in"], .sign-in-form__submit-button');
         btn?.click();
       });
-      await page.waitForTimeout(8000);
+      await page.waitForTimeout(6000);
       const afterUrl = page.url();
       console.log("    After login URL:", afterUrl);
+
+      const errorText = await page.evaluate(() => {
+        const el = document.querySelector('[role="alert"], .alert, .error, #error-for-password, #error-for-username');
+        return el?.textContent?.trim() || "(no error visible)";
+      });
+      console.log("    Error on page:", errorText);
+
       await page.screenshot({ path: path.join(DATA_DIR, "debug-after-login.png") });
 
       if (afterUrl.includes("checkpoint") || afterUrl.includes("challenge")) {
