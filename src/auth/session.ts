@@ -150,16 +150,18 @@ export class SessionManager {
         console.log("  PASSWORD DEBUG:", JSON.stringify(password), `len=${password.length}`);
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        const emailField = page.locator('input[type="email"]').first();
-        await emailField.waitFor({ state: "attached", timeout: 10000 });
-        await emailField.evaluate((el: any) => el.click());
-        await emailField.fill(email, { force: true });
-        const pwField = page.locator('input[type="password"]').first();
-        await pwField.waitFor({ state: "attached", timeout: 5000 });
-        await pwField.evaluate((el: any) => el.click());
-        await pwField.fill(password, { force: true });
+        await page.evaluate(() => {
+          document.querySelectorAll<HTMLElement>('input[type="email"], input[type="password"]').forEach(el => {
+            el.style.display = "block";
+            el.style.visibility = "visible";
+            el.style.opacity = "1";
+          });
+        });
+        await page.waitForTimeout(300);
+        await page.locator('input[type="email"]').first().fill(email);
+        await page.locator('input[type="password"]').first().fill(password);
         await page.waitForTimeout(500);
-      await page.getByRole("button", { name: "Sign in", exact: true }).first().evaluate((el: any) => el.click());
+        await page.keyboard.press("Enter");
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
