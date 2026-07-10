@@ -74,8 +74,14 @@ export class SessionManager {
       console.log("    Password entered");
 
       console.log("    Submitting...");
+      await page.waitForTimeout(500);
       await page.evaluate(() => {
-        (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
+        const form = document.querySelector("form");
+        if (form) {
+          form.requestSubmit();
+        } else {
+          (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
+        }
       });
       await page.waitForTimeout(6000);
       const afterUrl = page.url();
@@ -161,7 +167,9 @@ export class SessionManager {
           el.dispatchEvent(new Event("input", { bubbles: true }));
         }, password);
         await page.evaluate(() => {
-          (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
+          const form = document.querySelector("form");
+          if (form) form.requestSubmit();
+          else (document.querySelector<HTMLElement>('button[type="submit"]'))?.click();
         });
         await page.waitForTimeout(8000);
 
