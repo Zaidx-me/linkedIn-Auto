@@ -55,7 +55,7 @@ export class SessionManager {
 
       console.log("    Typing email...");
       await page.evaluate(() => {
-        (document.querySelector('input[autocomplete="username"]') as HTMLElement)?.focus();
+        (document.querySelector('input[autocomplete="username"]') as any)?.focus();
       });
       await page.waitForTimeout(500);
       await page.keyboard.type(email, { delay: 40 });
@@ -63,15 +63,19 @@ export class SessionManager {
 
       console.log("    Typing password...");
       await page.evaluate(() => {
-        (document.querySelector('input[type="password"]') as HTMLElement)?.focus();
+        (document.querySelector('input[type="password"]') as any)?.focus();
       });
       await page.waitForTimeout(500);
       await page.keyboard.type(password, { delay: 30 });
       console.log("    Password entered");
 
-      await page.screenshot({ path: path.join(DATA_DIR, "debug-login-filled.png") });
-      await page.locator('button[type="submit"]').first().click();
+      console.log("    Clicking Sign in...");
+      await page.evaluate(() => {
+        const btn = document.querySelector<HTMLElement>('button[type="submit"], button[aria-label="Sign in"], .sign-in-form__submit-button');
+        btn?.click();
+      });
       await page.waitForTimeout(8000);
+      await page.screenshot({ path: path.join(DATA_DIR, "debug-login-filled.png") });
 
       const url = page.url();
       if (url.includes("checkpoint") || url.includes("challenge")) {
@@ -142,7 +146,9 @@ export class SessionManager {
         });
         await page.waitForTimeout(300);
         await page.keyboard.type(password, { delay: 20 });
-        await page.locator('button[type="submit"]').first().click();
+        await page.evaluate(() => {
+          (document.querySelector('button[type="submit"], button[aria-label="Sign in"]') as any)?.click();
+        });
         await page.waitForTimeout(8000);
 
         const afterLogin = page.url();
