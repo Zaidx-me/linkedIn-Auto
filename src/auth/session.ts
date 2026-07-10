@@ -75,28 +75,30 @@ export class SessionManager {
 
       console.log("    Submitting...");
       await page.waitForTimeout(1000);
-      await page.evaluate(() => {
-        const pw = document.querySelector<HTMLElement>('input[type="password"]');
-        pw?.focus();
-      });
-      await page.waitForTimeout(500);
-      await page.keyboard.press("Enter");
-      await page.waitForTimeout(3000);
+      const hasForm = await page.evaluate(() => !!document.querySelector("form"));
+      const hasButton = await page.evaluate(() => !!document.querySelector('button[type="submit"]'));
+      const formId = await page.evaluate(() => document.querySelector("form")?.id || "no-id");
+      console.log("    Has form:", hasForm, "Has submit button:", hasButton, "Form ID:", formId);
 
-      const urlAfterSubmit = page.url();
-      console.log("    URL after submit:", urlAfterSubmit);
-
-      if (urlAfterSubmit.includes("/login")) {
-        console.log("    Enter didn't work, trying button click...");
+      if (hasForm) {
         await page.evaluate(() => {
-          const btn = document.querySelector<HTMLElement>(
-            'button[type="submit"], .sign-in-form__submit-button, button[aria-label="Sign in"]'
-          );
-          btn?.click();
+          const form = document.querySelector("form");
+          if (form) form.submit();
         });
-        await page.waitForTimeout(3000);
-        console.log("    URL after button click:", page.url());
+      } else if (hasButton) {
+        await page.evaluate(() => {
+          (document.querySelector('button[type="submit"]') as HTMLElement)?.click();
+        });
+      } else {
+        await page.evaluate(() => {
+          const pw = document.querySelector<HTMLElement>('input[type="password"]');
+          pw?.focus();
+        });
+        await page.waitForTimeout(300);
+        await page.keyboard.press("Enter");
       }
+      await page.waitForTimeout(5000);
+      console.log("    URL after submit:", page.url());
       await page.waitForTimeout(6000);
       const afterUrl = page.url();
       console.log("    After login URL:", afterUrl);
