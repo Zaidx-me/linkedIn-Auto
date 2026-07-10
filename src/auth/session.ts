@@ -11,6 +11,15 @@ const COOKIE_CHECK_URL = "https://www.linkedin.com/feed";
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
+function getCredentials(): { email: string; password: string } {
+  const email = process.env.LINKEDIN_EMAIL;
+  const password = process.env.LINKEDIN_PASSWORD;
+  if (!email || !password) {
+    throw new Error("LINKEDIN_EMAIL and LINKEDIN_PASSWORD must be set in environment");
+  }
+  return { email, password };
+}
+
 export class SessionManager {
   async ensureSession(): Promise<void> {
     if (fs.existsSync(PROFILE_DIR) && (await this.sessionValid())) {
@@ -23,8 +32,12 @@ export class SessionManager {
     }
     fs.mkdirSync(PROFILE_DIR, { recursive: true });
 
-    console.log("  Log into LinkedIn in the browser window, then come back here.\n");
+    const { email, password } = getCredentials();
+    await this.loginWithCredentials(email, password);
+  }
 
+  private async loginWithCredentials(email: string, password: string): Promise<void> {
+    console.log("  Logging in to LinkedIn...");
     const context = await chromium.launchPersistentContext(PROFILE_DIR, {
       headless: false,
       userAgent: USER_AGENT,
@@ -32,27 +45,29 @@ export class SessionManager {
       args: ["--disable-blink-features=AutomationControlled"],
     });
     const page = await context.newPage();
-    await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
 
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    await new Promise<void>((resolve) => rl.question("  Press Enter to continue... ", () => resolve()));
-    rl.close();
+    try {
+      await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
+      await page.waitForTimeout(2000);
 
-    // Quick check — did login actually work?
-    await page.goto("https://www.linkedin.com/feed", { waitUntil: "domcontentloaded", timeout: 15000 });
-    if (page.url().includes("/login") || page.url().includes("authwall")) {
-      await page.close();
+      await page.fill("#username", email);
+      await page.fill("#password", password);
+      await page.click('button[type="submit"]');
+      await page.waitForTimeout(5000);
+
+      const url = page.url();
+      if (url.includes("checkpoint") || url.includes("challenge")) {
+        const screenshotPath = path.join(DATA_DIR, `challenge-${Date.now()}.png`);
+        await page.screenshot({ path: screenshotPath });
+        throw new CaptchaBlockedError(screenshotPath);
+      }
+      if (url.includes("/login") || url.includes("authwall")) {
+        throw new Error("Login failed — check LINKEDIN_EMAIL and LINKEDIN_PASSWORD");
+      }
+    } finally {
       await context.close();
-      fs.rmSync(PROFILE_DIR, { recursive: true, force: true });
-      throw new Error(
-        "Session not recognized after login. " +
-        "Make sure you complete any verification steps (email/SMS code) " +
-        "before pressing Enter. Run again to try."
-      );
     }
-
-    await context.close();
-    console.log("Profile saved.\n");
+    console.log("  Login successful.\n");
   }
 
   private async sessionValid(): Promise<boolean> {
@@ -91,7 +106,25 @@ export class SessionManager {
 
       const url = page.url();
       if (url.includes("/login") || url.includes("authwall")) {
-        throw new Error("Session expired");
+        const { email, password } = getCredentials();
+        console.log("[publisher] Session expired, logging in with credentials...");
+        await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
+        await page.waitForTimeout(2000);
+        await page.fill("#username", email);
+        await page.fill("#password", password);
+        await page.click('button[type="submit"]');
+        await page.waitForTimeout(5000);
+
+        const afterLogin = page.url();
+        if (afterLogin.includes("checkpoint") || afterLogin.includes("challenge")) {
+          const screenshotPath = path.join(DATA_DIR, `challenge-${Date.now()}.png`);
+          await page.screenshot({ path: screenshotPath });
+          throw new CaptchaBlockedError(screenshotPath);
+        }
+        if (afterLogin.includes("/login") || afterLogin.includes("authwall")) {
+          throw new Error("Login failed — check LINKEDIN_EMAIL and LINKEDIN_PASSWORD");
+        }
+        console.log("[publisher] Re-authenticated with credentials");
       }
       if (url.includes("checkpoint") || url.includes("challenge")) {
         if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
