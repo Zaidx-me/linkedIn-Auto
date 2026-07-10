@@ -75,27 +75,38 @@ export class SessionManager {
 
       console.log("    Submitting...");
       await page.waitForTimeout(1000);
-      const hasForm = await page.evaluate(() => !!document.querySelector("form"));
-      const hasButton = await page.evaluate(() => !!document.querySelector('button[type="submit"]'));
-      const formId = await page.evaluate(() => document.querySelector("form")?.id || "no-id");
-      console.log("    Has form:", hasForm, "Has submit button:", hasButton, "Form ID:", formId);
+      const pageInfo = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll("button, [role=button], a"));
+        const clickables = buttons.map(b => ({
+          tag: b.tagName,
+          type: (b as any).type || "",
+          text: (b.textContent || "").trim().slice(0, 30),
+          role: b.getAttribute("role") || "",
+          cls: (b.className || "").slice(0, 40),
+        }));
+        const inputs = Array.from(document.querySelectorAll("input")).map(i => ({
+          id: i.id,
+          type: i.type,
+          autocomplete: i.autocomplete,
+          placeholder: i.placeholder,
+          hidden: i.type === "hidden",
+        }));
+        return { clickables, inputs };
+      });
+      console.log("    Buttons found:", pageInfo.clickables.length);
+      pageInfo.clickables.forEach((b, i) => console.log(`      [${i}] <${b.tag}> type="${b.type}" text="${b.text}" role="${b.role}"`));
+      console.log("    Inputs found:", pageInfo.inputs.length);
+      pageInfo.inputs.forEach((i, idx) => console.log(`      [${idx}] id="${i.id}" type="${i.type}" auto="${i.autocomplete}" hidden=${i.hidden}`));
 
-      if (hasForm) {
+      const signInBtn = pageInfo.clickables.find(b => /sign in/i.test(b.text));
+      if (signInBtn) {
+        console.log("    Found Sign in button! Clicking...");
         await page.evaluate(() => {
-          const form = document.querySelector("form");
-          if (form) form.submit();
+          const btn = Array.from(document.querySelectorAll("button, [role=button], a")).find(
+            el => /sign in/i.test(el.textContent || "")
+          ) as HTMLElement;
+          btn?.click();
         });
-      } else if (hasButton) {
-        await page.evaluate(() => {
-          (document.querySelector('button[type="submit"]') as HTMLElement)?.click();
-        });
-      } else {
-        await page.evaluate(() => {
-          const pw = document.querySelector<HTMLElement>('input[type="password"]');
-          pw?.focus();
-        });
-        await page.waitForTimeout(300);
-        await page.keyboard.press("Enter");
       }
       await page.waitForTimeout(5000);
       console.log("    URL after submit:", page.url());
