@@ -53,15 +53,20 @@ export class SessionManager {
       await page.waitForTimeout(3000);
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-page.png") });
 
-      console.log("    Looking for email field...");
-      const emailField = page.locator('input[autocomplete="username"], input[name="session_key"]').first();
-      await emailField.waitFor({ state: "attached", timeout: 15000 });
-      await emailField.fill(email, { force: true });
+      console.log("    Typing email...");
+      await page.evaluate(() => {
+        (document.querySelector('input[autocomplete="username"]') as HTMLElement)?.focus();
+      });
+      await page.waitForTimeout(500);
+      await page.keyboard.type(email, { delay: 40 });
       console.log("    Email entered");
 
-      const pwField = page.locator('input[type="password"]').first();
-      await pwField.waitFor({ state: "attached", timeout: 5000 });
-      await pwField.fill(password, { force: true });
+      console.log("    Typing password...");
+      await page.evaluate(() => {
+        (document.querySelector('input[type="password"]') as HTMLElement)?.focus();
+      });
+      await page.waitForTimeout(500);
+      await page.keyboard.type(password, { delay: 30 });
       console.log("    Password entered");
 
       await page.screenshot({ path: path.join(DATA_DIR, "debug-login-filled.png") });
@@ -127,8 +132,16 @@ export class SessionManager {
         console.log("[publisher] Session expired, logging in with credentials...");
         await page.goto("https://www.linkedin.com/login", { waitUntil: "load", timeout: 60000 });
         await page.waitForTimeout(2000);
-        await page.locator('input[autocomplete="username"]').first().fill(email, { force: true });
-        await page.locator('input[type="password"]').first().fill(password, { force: true });
+        await page.evaluate(() => {
+          (document.querySelector('input[autocomplete="username"]') as any)?.focus();
+        });
+        await page.waitForTimeout(300);
+        await page.keyboard.type(email, { delay: 20 });
+        await page.evaluate(() => {
+          (document.querySelector('input[type="password"]') as any)?.focus();
+        });
+        await page.waitForTimeout(300);
+        await page.keyboard.type(password, { delay: 20 });
         await page.locator('button[type="submit"]').first().click();
         await page.waitForTimeout(8000);
 
