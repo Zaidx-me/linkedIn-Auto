@@ -7,7 +7,9 @@ export type PostStatus = "pending_review" | "approved" | "rejected" | "published
 
 export interface StoredPost {
   id: number;
-  pillarId: string;
+  day: number;
+  postType: string;
+  hook: string;
   topic: string;
   text: string;
   charCount: number;
@@ -35,6 +37,9 @@ export class PostStore {
     if (fs.existsSync(this.dbPath)) {
       const buffer = fs.readFileSync(this.dbPath);
       this.db = new SQL.Database(buffer);
+
+      // Migrate: add new columns if they don't exist
+      this.migrate();
     } else {
       this.db = new SQL.Database();
     }
@@ -42,7 +47,9 @@ export class PostStore {
     this.db.run(`
       CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY,
-        pillarId TEXT NOT NULL,
+        day INTEGER NOT NULL DEFAULT 0,
+        postType TEXT NOT NULL DEFAULT 'lesson',
+        hook TEXT NOT NULL DEFAULT '',
         topic TEXT NOT NULL,
         text TEXT NOT NULL,
         charCount INTEGER NOT NULL,
@@ -62,6 +69,24 @@ export class PostStore {
     this.save();
   }
 
+  private migrate() {
+    if (!this.db) return;
+    // Check if new columns exist, add them if not
+    const cols = this.db.exec("PRAGMA table_info(posts)");
+    if (cols.length > 0) {
+      const columnNames = cols[0].values.map((r) => r[1]);
+      if (!columnNames.includes("day")) {
+        this.db.run("ALTER TABLE posts ADD COLUMN day INTEGER NOT NULL DEFAULT 0");
+      }
+      if (!columnNames.includes("postType")) {
+        this.db.run("ALTER TABLE posts ADD COLUMN postType TEXT NOT NULL DEFAULT 'lesson'");
+      }
+      if (!columnNames.includes("hook")) {
+        this.db.run("ALTER TABLE posts ADD COLUMN hook TEXT NOT NULL DEFAULT ''");
+      }
+    }
+  }
+
   private save() {
     if (!this.db) return;
     const data = this.db.export();
@@ -72,12 +97,14 @@ export class PostStore {
     if (!this.db) throw new Error("PostStore not initialized. Call init() first.");
     const id = this.nextId++;
     const stmt = this.db.prepare(`
-      INSERT INTO posts (id, pillarId, topic, text, charCount, hashtags, model, status, generatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_review', ?)
+      INSERT INTO posts (id, day, postType, hook, topic, text, charCount, hashtags, model, status, generatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?)
     `);
     stmt.run([
       id,
-      post.pillarId,
+      post.day,
+      post.postType,
+      post.hook,
       post.topic,
       post.text,
       post.charCount,

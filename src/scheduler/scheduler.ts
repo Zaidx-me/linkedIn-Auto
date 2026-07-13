@@ -5,40 +5,38 @@ import { PostGenerator } from "../generation/postGenerator";
 import { PostStore } from "../storage/postStore";
 import { Publisher } from "../publish/publisher";
 import { CaptchaBlockedError } from "../auth/captchaError";
-import { brainstorm } from "../brainstorm";
+import { loadCalendar, getDay, getNextTheme } from "../config/calendar";
+import { getPostTypes, getNextPostType, PostType } from "../config/templates";
+import { scorePost } from "../generation/postProcessor";
 
 const DATA_DIR = process.cwd();
-const TOPICS_FILE = path.resolve(DATA_DIR, "data/topics.json");
 const PROGRESS_FILE = path.resolve(DATA_DIR, "data/schedule-progress.json");
 const DB_PATH = process.env.DB_PATH || "./data/posts.db";
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "";
 const NVIDIA_MODEL = process.env.NVIDIA_MODEL || "meta/llama-3.1-70b-instruct";
 
-const TOTAL_POSTS = 90;
-const INTERVAL_MS = 8 * 60 * 60 * 1000;
-const RETRY_INTERVAL_MS = 30 * 60 * 1000;
+const TOTAL_DAYS = 30;
+const POSTS_PER_DAY = 4;
+const TOTAL_POSTS = TOTAL_DAYS * POSTS_PER_DAY; // 120
+const INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours between posts
+const RETRY_INTERVAL_MS = 30 * 60 * 1000; // 30 min retry on error
+const QUALITY_THRESHOLD = 6; // minimum score to accept a post
+const MAX_RETRIES = 2; // additional retries if score too low
+
+const POST_TYPES = getPostTypes(); // ["lesson", "example", "mistake", "challenge"]
 
 interface Progress {
-  topicIndex: number;
-  postsRemaining: number;
+  dayIndex: number; // 0-29
+  postTypeIndex: number; // 0-3
   lastPostTime: string | null;
   done: boolean;
-}
-
-function loadTopics(): string[] {
-  if (!fs.existsSync(TOPICS_FILE)) {
-    console.error(`[scheduler] topics file not found at ${TOPICS_FILE}`);
-    console.error(`[scheduler] Create data/topics.json with an array of topic strings`);
-    process.exit(1);
-  }
-  return JSON.parse(fs.readFileSync(TOPICS_FILE, "utf-8"));
 }
 
 function loadProgress(): Progress {
   if (fs.existsSync(PROGRESS_FILE)) {
     return JSON.parse(fs.readFileSync(PROGRESS_FILE, "utf-8"));
   }
-  return { topicIndex: 0, postsRemaining: TOTAL_POSTS, lastPostTime: null, done: false };
+  return { dayIndex: 0, postTypeIndex: 0, lastPostTime: null, done: false };
 }
 
 function saveProgress(p: Progress) {
@@ -53,32 +51,105 @@ async function postOnce(
   generator: PostGenerator,
   store: PostStore,
   publisher: Publisher,
-  topic: string,
-) {
-  console.log(`\n[scheduler] Topic: "${topic}"`);
-  console.log("[scheduler] Generating post...");
-  const post = await brainstorm(topic, generator);
-  console.log(`[scheduler] Generated (${post.charCount} chars)`);
+  dayIndex: number,
+  postTypeIndex: number
+): Promise<boolean> {
+  const calendarDay = getDay(dayIndex);
+  const postType = POST_TYPES[postTypeIndex];
+  const tomorrowTheme = getNextTheme(dayIndex);
 
-  const id = store.savePost(post);
+  console.log(`\n[scheduler] Day ${calendarDay.day}/${TOTAL_DAYS} | Post ${postTypeIndex + 1}/${POSTS_PER_DAY} | Type: ${postType}`);
+  console.log(`[scheduler] Theme: "${calendarDay.theme}"`);
+  console.log(`[scheduler] Hook: "${calendarDay.hook}"`);
+
+  // Generate 3 variants
+  console.log("[scheduler] Generating 3 variants...");
+  const variants = await generator.generateVariants(
+    {
+      topic: calendarDay.theme,
+      hook: calendarDay.hook,
+      postType,
+      tomorrowTheme,
+    },
+    3
+  );
+
+  // Score each variant
+  const scored = variants.map((v) => ({
+    post: v,
+    scoreResult: scorePost(v.text),
+  }));
+
+  scored.sort((a, b) => b.scoreResult.score - a.scoreResult.score);
+  const best = scored[0];
+
+  console.log(`[scheduler] Best variant score: ${best.scoreResult.score}/10`);
+  console.log(`[scheduler] Reasons: ${best.scoreResult.reasons.join("; ")}`);
+
+  // Quality gate: retry if score too low
+  let finalPost = best.post;
+  let finalScore = best.scoreResult.score;
+
+  if (finalScore < QUALITY_THRESHOLD) {
+    console.log(`[scheduler] Score ${finalScore} below threshold ${QUALITY_THRESHOLD}. Retrying...`);
+
+    for (let retry = 0; retry < MAX_RETRIES; retry++) {
+      const retryTemp = 0.3 + retry * 0.2;
+      console.log(`[scheduler] Retry ${retry + 1}/${MAX_RETRIES} at temp ${retryTemp}...`);
+
+      const retryVariant = await generator.generate({
+        topic: calendarDay.theme,
+        hook: calendarDay.hook,
+        postType,
+        tomorrowTheme,
+        temperature: retryTemp,
+      });
+
+      const retryScore = scorePost(retryVariant.text);
+      console.log(`[scheduler] Retry score: ${retryScore.score}/10`);
+
+      if (retryScore.score > finalScore) {
+        finalPost = retryVariant;
+        finalScore = retryScore.score;
+        console.log(`[scheduler] Improved! New best: ${finalScore}/10`);
+      }
+
+      if (finalScore >= QUALITY_THRESHOLD) {
+        console.log(`[scheduler] Quality gate passed at score ${finalScore}`);
+        break;
+      }
+    }
+  }
+
+  // Save as approved
+  const id = store.savePost(finalPost);
   store.updateStatus(id, "approved");
-  console.log(`[scheduler] Post #${id} saved and approved`);
+  console.log(`[scheduler] Post #${id} saved and approved (score: ${finalScore}/10)`);
 
+  // Publish to LinkedIn
   console.log("[scheduler] Publishing to LinkedIn...");
-  await publisher.publish(post);
+  await publisher.publish(finalPost);
   store.updateStatus(id, "published");
   console.log(`[scheduler] Post #${id} published successfully`);
+
+  return true;
 }
 
 async function main() {
-  const days = Math.ceil(TOTAL_POSTS / 3);
   console.log("========================================");
   console.log("  LinkedIn Auto Scheduler");
-  console.log(`  3 posts/day for ${days} days (${TOTAL_POSTS} total)`);
+  console.log(`  4 posts/day for ${TOTAL_DAYS} days (${TOTAL_POSTS} total)`);
+  console.log(`  Spacing: ${INTERVAL_MS / (60 * 60 * 1000)}h between posts`);
+  console.log(`  Quality threshold: ${QUALITY_THRESHOLD}/10`);
   console.log("========================================\n");
 
-  const topics = loadTopics();
-  console.log(`[scheduler] Loaded ${topics.length} topics`);
+  // Validate calendar
+  const calendar = loadCalendar();
+  if (calendar.length < TOTAL_DAYS) {
+    console.error(`[scheduler] Calendar has ${calendar.length} days, expected ${TOTAL_DAYS}`);
+    process.exit(1);
+  }
+  console.log(`[scheduler] Loaded ${calendar.length} calendar days`);
 
   const generator = new PostGenerator(NVIDIA_API_KEY, NVIDIA_MODEL);
   const store = new PostStore(DB_PATH);
@@ -91,47 +162,50 @@ async function main() {
     return;
   }
 
-  console.log(`[scheduler] ${progress.postsRemaining} posts remaining\n`);
+  const completedPosts =
+    progress.dayIndex * POSTS_PER_DAY + progress.postTypeIndex;
+  console.log(`[scheduler] ${TOTAL_POSTS - completedPosts} posts remaining\n`);
 
-  while (progress.postsRemaining > 0) {
-    if (progress.topicIndex >= topics.length) {
-      console.log("[scheduler] All topics used — cycling from start");
-      progress.topicIndex = 0;
-    }
-
-    const topic = topics[progress.topicIndex++];
+  while (progress.dayIndex < TOTAL_DAYS) {
     try {
-      await postOnce(generator, store, publisher, topic);
-      progress.postsRemaining--;
+      await postOnce(generator, store, publisher, progress.dayIndex, progress.postTypeIndex);
+
+      // Advance progress
+      progress.postTypeIndex++;
+      if (progress.postTypeIndex >= POSTS_PER_DAY) {
+        progress.postTypeIndex = 0;
+        progress.dayIndex++;
+      }
+
       progress.lastPostTime = new Date().toISOString();
       saveProgress(progress);
 
-      const done = TOTAL_POSTS - progress.postsRemaining;
-      const totalDays = Math.ceil(TOTAL_POSTS / 3);
-      const currentDay = Math.ceil(done / 3);
-      const dayPost = done % 3 || 3;
-      console.log(`[scheduler] Post ${done}/${TOTAL_POSTS} (Day ${currentDay}/${totalDays}, post ${dayPost}/3)`);
+      // Status
+      const done = progress.dayIndex * POSTS_PER_DAY + progress.postTypeIndex;
+      const currentDay = progress.dayIndex + 1;
+      const dayPost = progress.postTypeIndex || POSTS_PER_DAY;
+      console.log(`[scheduler] Progress: ${done}/${TOTAL_POSTS} (Day ${currentDay}/${TOTAL_DAYS}, post ${dayPost}/${POSTS_PER_DAY})`);
 
-      if (progress.postsRemaining <= 0) {
+      // Check if all done
+      if (progress.dayIndex >= TOTAL_DAYS) {
         progress.done = true;
         saveProgress(progress);
-        console.log("\n[scheduler] ✅ All 90 posts published!");
+        console.log("\n[scheduler] All 120 posts published!");
         break;
       }
     } catch (err: any) {
       if (err instanceof CaptchaBlockedError) {
-        console.error(`[scheduler] ❌ CAPTCHA blocked. Run 'npm run auth:login' then restart.`);
+        console.error(`[scheduler] CAPTCHA blocked. Run 'npm run auth:login' then restart.`);
         process.exit(3);
       }
-      console.error(`[scheduler] ❌ Failed: ${err.message}. Retrying in 30 min...`);
-      progress.topicIndex--;
+      console.error(`[scheduler] Failed: ${err.message}. Retrying in 30 min...`);
       await sleep(RETRY_INTERVAL_MS);
       continue;
     }
 
     const nextPost = new Date(Date.now() + INTERVAL_MS);
     console.log(`[scheduler] Next post at ${nextPost.toLocaleString()}`);
-    console.log(`[scheduler] Waiting 8h...\n`);
+    console.log(`[scheduler] Waiting ${INTERVAL_MS / (60 * 60 * 1000)}h...\n`);
     await sleep(INTERVAL_MS);
   }
 }

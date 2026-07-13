@@ -33,12 +33,14 @@ button{padding:8px 20px;border:none;border-radius:6px;font-family:inherit;font-s
 .btn-reject:hover{opacity:.85}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px}
 .card p{font-size:13px;line-height:1.6;margin-bottom:8px;white-space:pre-wrap}
+.card .hook{font-size:12px;color:var(--accent);font-style:italic;margin-bottom:8px;padding:6px 10px;background:rgba(88,166,255,.06);border-left:3px solid var(--accent);border-radius:0 4px 4px 0}
 .card .meta{font-size:12px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap}
 .card .meta span{display:inline-flex;align-items:center;gap:4px}
 .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
 .badge-pending{background:rgba(210,153,34,.15);color:var(--yellow)}
 .badge-approved{background:rgba(63,185,80,.15);color:var(--green)}
 .badge-rejected{background:rgba(248,81,73,.15);color:var(--red)}
+.badge-type{background:rgba(88,166,255,.15);color:var(--accent)}
 .actions{display:flex;gap:8px;margin-top:10px}
 @media(max-width:640px){body{flex-direction:column} nav{width:100%;min-height:auto;border-right:none;border-bottom:1px solid var(--border);padding:12px 0} nav a{padding:8px 16px} main{padding:20px}}
 </style>
@@ -46,27 +48,36 @@ button{padding:8px 20px;border:none;border-radius:6px;font-family:inherit;font-s
 <body>
 <nav>
   <h2>linkedin-content-gen</h2>
-  <a href="#generate" data-tab="generate" class="active">✏️ Generate</a>
-  <a href="#queue" data-tab="queue">📋 Queue</a>
-  <a href="#approved" data-tab="approved">✅ Approved</a>
+  <a href="#generate" data-tab="generate" class="active">Generate</a>
+  <a href="#queue" data-tab="queue">Queue</a>
+  <a href="#approved" data-tab="approved">Approved</a>
 </nav>
 <main>
   <div id="tab-generate" class="tab active">
     <h1>Generate Post</h1>
     <div class="form-group">
-      <label for="pillar">Content Pillar</label>
-      <select id="pillar" required></select>
+      <label for="postType">Post Type</label>
+      <select id="postType" required>
+        <option value="lesson">Lesson</option>
+        <option value="example">Real Example</option>
+        <option value="mistake">Common Mistake</option>
+        <option value="challenge">Practice Challenge</option>
+      </select>
     </div>
     <div class="form-group">
-      <label for="topic">Topic</label>
-      <input type="text" id="topic" placeholder="What's this post about?" required minlength="3">
+      <label for="topic">Theme</label>
+      <input type="text" id="topic" placeholder="e.g. Why communication matters" required minlength="3">
+    </div>
+    <div class="form-group">
+      <label for="hook">Hook <span style="color:var(--text-muted)">(the opening line)</span></label>
+      <input type="text" id="hook" placeholder="e.g. Intelligence is entirely useless if you can't articulate your thoughts." required minlength="3">
     </div>
     <div class="form-group">
       <label for="context">Extra Context <span style="color:var(--text-muted)">(optional)</span></label>
-      <textarea id="context" placeholder="Any specific details, commands, errors, or results to include..."></textarea>
+      <textarea id="context" placeholder="Any specific details, scenarios, or examples to include..."></textarea>
     </div>
     <div class="form-group">
-      <label for="variants">Variants <span style="color:var(--text-muted)">(1–5)</span></label>
+      <label for="variants">Variants <span style="color:var(--text-muted)">(1-5)</span></label>
       <input type="number" id="variants" value="3" min="1" max="5" style="width:80px">
     </div>
     <button class="btn-primary" id="btn-generate">Generate</button>
@@ -104,38 +115,35 @@ document.querySelectorAll('nav a').forEach(a => {
     if (tab === 'approved') { loadApproved(); loadPublished(); }
   });
 });
-// --- Pillars ---
-async function loadPillars() {
-  const pillars = await api('/pillars');
-  document.getElementById('pillar').innerHTML = pillars.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
-}
-loadPillars();
 // --- Generate
 document.getElementById('btn-generate').addEventListener('click', async () => {
-  const pillarId = document.getElementById('pillar').value;
+  const postType = document.getElementById('postType').value;
   const topic = document.getElementById('topic').value.trim();
+  const hook = document.getElementById('hook').value.trim();
   const extraContext = document.getElementById('context').value.trim();
   const variants = parseInt(document.getElementById('variants').value) || 3;
-  if (!topic || topic.length < 3) return alert('Topic must be at least 3 characters.');
+  if (!topic || topic.length < 3) return alert('Theme must be at least 3 characters.');
+  if (!hook || hook.length < 3) return alert('Hook must be at least 3 characters.');
   const btn = document.getElementById('btn-generate');
   btn.disabled = true; btn.textContent = 'Generating...';
   try {
     const data = await api('/generate', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({pillarId, topic, extraContext, variants})
+      body: JSON.stringify({postType, topic, hook, extraContext, variants})
     });
     const el = document.getElementById('results');
     el.innerHTML = '<h2 style="font-size:14px;color:var(--text-muted);margin-bottom:12px">Results</h2>' +
       (data.posts || []).map(p => {
         const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
         return `<div class="card" data-id="${p.id}">
+          <div class="hook">${escapeHtml(p.hook)}</div>
           <p>${escapeHtml(p.text)}</p>
           <div class="meta">
-            <span>📏 ${p.charCount} chars</span>
-            <span>🏷️ ${escapeHtml(hashtags)}</span>
-            <span>🤖 ${p.model || '—'}</span>
-            <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
+            <span class="badge badge-type">${escapeHtml(p.postType)}</span>
+            <span>${p.charCount} chars</span>
+            <span>${escapeHtml(hashtags)}</span>
+            <span>${new Date(p.generatedAt).toLocaleString()}</span>
             <span class="badge badge-pending">Pending</span>
           </div>
           <div class="actions">
@@ -160,12 +168,14 @@ async function loadQueue() {
     el.innerHTML = posts.map(p => {
       const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
       return `<div class="card" data-id="${p.id}">
+        <div class="hook">${escapeHtml(p.hook)}</div>
         <p>${escapeHtml(p.text)}</p>
         <div class="meta">
-          <span>📏 ${p.charCount} chars</span>
-          <span>🏷️ ${escapeHtml(hashtags)}</span>
-          <span>📂 ${escapeHtml(p.pillarId)}</span>
-          <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
+          <span class="badge badge-type">${escapeHtml(p.postType)}</span>
+          <span>Day ${p.day}</span>
+          <span>${p.charCount} chars</span>
+          <span>${escapeHtml(hashtags)}</span>
+          <span>${new Date(p.generatedAt).toLocaleString()}</span>
           <span class="badge badge-pending">Pending</span>
         </div>
         <div class="actions">
@@ -175,7 +185,7 @@ async function loadQueue() {
       </div>`;
     }).join('');
   } catch (err) {
-    el.innerHTML = `<p style="color:var(--red)">Failed to load queue: ${err.message}</p>`;
+    el.innerHTML = '<p style="color:var(--red)">Failed to load queue: ' + err.message + '</p>';
   }
 }
 
@@ -201,12 +211,12 @@ async function publishPost(id, btn) {
   btn.disabled = true; btn.textContent = 'Publishing...';
   try {
     await api('/queue/' + id + '/publish', {method:'POST'});
-    btn.textContent = '✅ Published!';
+    btn.textContent = 'Published!';
     btn.style.background = 'var(--green)';
     setTimeout(() => loadApproved(), 1500);
   } catch (err) {
     alert('Publish failed: ' + err.message);
-    btn.disabled = false; btn.textContent = '📤 Publish to LinkedIn';
+    btn.disabled = false; btn.textContent = 'Publish to LinkedIn';
   }
 }
 // --- Approved ---
@@ -219,19 +229,21 @@ async function loadApproved() {
     el.innerHTML = posts.map(p => {
       const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
       return `<div class="card" data-id="${p.id}">
+        <div class="hook">${escapeHtml(p.hook)}</div>
         <p>${escapeHtml(p.text)}</p>
         <div class="meta">
-          <span>📏 ${p.charCount} chars</span>
-          <span>🏷️ ${escapeHtml(hashtags)}</span>
-          <span>📂 ${escapeHtml(p.pillarId)}</span>
-          <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
-          <span class="badge badge-pending">Approved</span>
+          <span class="badge badge-type">${escapeHtml(p.postType)}</span>
+          <span>Day ${p.day}</span>
+          <span>${p.charCount} chars</span>
+          <span>${escapeHtml(hashtags)}</span>
+          <span>${new Date(p.generatedAt).toLocaleString()}</span>
+          <span class="badge badge-approved">Approved</span>
         </div>
-        <div class="actions"><button class="btn-primary" onclick="publishPost(${p.id}, this)">📤 Publish to LinkedIn</button></div>
+        <div class="actions"><button class="btn-primary" onclick="publishPost(${p.id}, this)">Publish to LinkedIn</button></div>
       </div>`;
     }).join('');
   } catch (err) {
-    el.innerHTML = `<p style="color:var(--red)">Failed to load: ${err.message}</p>`;
+    el.innerHTML = '<p style="color:var(--red)">Failed to load: ' + err.message + '</p>';
   }
 }
 // --- Published ---
@@ -243,19 +255,21 @@ async function loadPublished() {
     el.innerHTML = posts.map(p => {
       const hashtags = typeof p.hashtags === 'string' ? p.hashtags : (p.hashtags || []).join(' ');
       return `<div class="card" data-id="${p.id}">
+        <div class="hook">${escapeHtml(p.hook)}</div>
         <p>${escapeHtml(p.text)}</p>
         <div class="meta">
-          <span>📏 ${p.charCount} chars</span>
-          <span>🏷️ ${escapeHtml(hashtags)}</span>
-          <span>📂 ${escapeHtml(p.pillarId)}</span>
-          <span>🕐 ${new Date(p.generatedAt).toLocaleString()}</span>
-          <span>📅 Published: ${p.publishedAt ? new Date(p.publishedAt).toLocaleString() : '?'}</span>
-          <span class="badge badge-approved">Published ✅</span>
+          <span class="badge badge-type">${escapeHtml(p.postType)}</span>
+          <span>Day ${p.day}</span>
+          <span>${p.charCount} chars</span>
+          <span>${escapeHtml(hashtags)}</span>
+          <span>${new Date(p.generatedAt).toLocaleString()}</span>
+          <span>Published: ${p.publishedAt ? new Date(p.publishedAt).toLocaleString() : '?'}</span>
+          <span class="badge badge-approved">Published</span>
         </div>
       </div>`;
     }).join('');
   } catch (err) {
-    el.innerHTML = `<p style="color:var(--red)">Failed to load: ${err.message}</p>`;
+    el.innerHTML = '<p style="color:var(--red)">Failed to load: ' + err.message + '</p>';
   }
 }
 </script>

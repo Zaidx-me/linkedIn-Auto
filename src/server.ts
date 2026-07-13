@@ -3,12 +3,12 @@ import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
-import { PostGenerator } from "./generation/postGenerator";
+import { PostGenerator, GeneratePostResult } from "./generation/postGenerator";
 import { PostStore } from "./storage/postStore";
-import { persona } from "./config/persona";
 import { Publisher } from "./publish/publisher";
 import { CaptchaBlockedError } from "./auth/captchaError";
-import { GeneratePostResult } from "./generation/postGenerator";
+import { loadCalendar, getDay, getNextTheme } from "./config/calendar";
+import { getPostTypes, PostType } from "./config/templates";
 
 const PORT = Number(process.env.PORT || 4000);
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "";
@@ -26,7 +26,7 @@ app.use((req: Request, _res: Response, next) => {
   const start = Date.now();
   _res.on("finish", () => {
     const ms = Date.now() - start;
-    console.log(`[${req.method}] ${req.originalUrl} → ${_res.statusCode} (${ms}ms)`);
+    console.log(`[${req.method}] ${req.originalUrl} -> ${_res.statusCode} (${ms}ms)`);
   });
   next();
 });
@@ -37,17 +37,28 @@ const store = new PostStore(DB_PATH);
 // --- Schemas -----------------------------------------------------------
 
 const generateSchema = z.object({
-  pillarId: z.string(),
   topic: z.string().min(3),
+  hook: z.string().min(3),
+  postType: z.enum(["lesson", "example", "mistake", "challenge"]),
   extraContext: z.string().optional(),
   variants: z.number().int().min(1).max(5).optional(),
 });
 
 // --- Routes --------------------------------------------------------------
 
-/** List available content pillars — useful for building a UI dropdown. */
-app.get("/pillars", (_req: Request, res: Response) => {
-  res.json(persona.contentPillars);
+/** List available calendar days — useful for building a UI dropdown. */
+app.get("/calendar", (_req: Request, res: Response) => {
+  try {
+    const calendar = loadCalendar();
+    res.json(calendar);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** List available post types. */
+app.get("/post-types", (_req: Request, res: Response) => {
+  res.json(getPostTypes());
 });
 
 /** Generate one or more post variants and store them as pending_review. */
@@ -56,16 +67,16 @@ app.post("/generate", async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
-  const { pillarId, topic, extraContext, variants } = parsed.data;
+  const { topic, hook, postType, extraContext, variants } = parsed.data;
 
   try {
-    console.log(`[generate] pillar=${pillarId} topic="${topic}" variants=${variants || 1}`);
+    console.log(`[generate] type=${postType} topic="${topic}" variants=${variants || 1}`);
     const results = variants
-      ? await generator.generateVariants({ pillarId, topic, extraContext }, variants)
-      : [await generator.generate({ pillarId, topic, extraContext })];
+      ? await generator.generateVariants({ topic, hook, postType, extraContext }, variants)
+      : [await generator.generate({ topic, hook, postType, extraContext })];
 
     const stored = results.map((r) => ({ id: store.savePost(r), ...r }));
-    console.log(`[generate] → ${stored.length} post(s) saved (ids: ${stored.map(s => s.id).join(",")})`);
+    console.log(`[generate] -> ${stored.length} post(s) saved (ids: ${stored.map((s) => s.id).join(",")})`);
     res.json({ posts: stored });
   } catch (err: any) {
     console.error(`[generate] ERROR: ${err.message}`);
@@ -112,7 +123,9 @@ app.post("/queue/:id/publish", async (req: Request, res: Response) => {
     hashtags: JSON.parse(post.hashtags || "[]"),
     withinLimit: true,
     warnings: [],
-    pillarId: post.pillarId,
+    day: post.day,
+    postType: post.postType as PostType,
+    hook: post.hook,
     topic: post.topic,
     model: post.model,
     generatedAt: post.generatedAt,
@@ -155,12 +168,12 @@ app.get("*", (_req: Request, res: Response) => {
 async function start() {
   await store.init();
   app.listen(PORT, () => {
-    console.log(`\n  🚀  linkedin-content-gen ready at http://localhost:${PORT}`);
-    console.log(`  🤖  Model: ${NVIDIA_MODEL}`);
+    console.log(`\n  linkedin-content-gen ready at http://localhost:${PORT}`);
+    console.log(`  Model: ${NVIDIA_MODEL}`);
     if (!NVIDIA_API_KEY) {
-      console.warn("\n  ⚠️  NVIDIA_API_KEY is not set — /generate will fail until you set it in .env\n");
+      console.warn("\n  NVIDIA_API_KEY is not set — /generate will fail until you set it in .env\n");
     }
-    console.log("  ─────────────────────────────────────────────\n");
+    console.log("  -------------------------------------------\n");
   });
 }
 

@@ -1,6 +1,7 @@
 node_modules/
 dist/
-data/
+data/chrome_profile/
+data/*.tar.gz
 .superpowers/
 .env
 *.log

@@ -1,53 +1,17 @@
 import { PostGenerator, GeneratePostResult } from "./generation/postGenerator";
-import { persona } from "./config/persona";
+import { PostType } from "./config/templates";
 
-function classifyPillar(topic: string): { id: string; score: number } {
-  if (persona.contentPillars.length === 0) {
-    throw new Error("persona.contentPillars is empty — cannot classify topic");
-  }
-
-  const topicLower = topic.toLowerCase();
-  let best: { id: string; score: number } = { id: persona.contentPillars[0].id, score: 0 };
-
-  for (const pillar of persona.contentPillars) {
-    const keywords = pillar.exampleTopics
-      .flatMap((t) => t.toLowerCase().split(" "))
-      .concat(pillar.description.toLowerCase().split(" "));
-    const matches = keywords.filter((kw) => topicLower.includes(kw)).length;
-    if (matches > best.score) {
-      best = { id: pillar.id, score: matches };
-    }
-  }
-  return best;
-}
-
-export async function brainstorm(
+export async function generatePost(
   topic: string,
-  generator: PostGenerator
+  hook: string,
+  postType: PostType,
+  generator: PostGenerator,
+  tomorrowTheme?: string
 ): Promise<GeneratePostResult> {
-  const { id: pillarId, score: bestScore } = classifyPillar(topic);
-
-  let resolvedPillarId = pillarId;
-  if (bestScore === 0) {
-    const pillarDescriptions = persona.contentPillars
-      .map((p) => `${p.id}: ${p.description}`)
-      .join("\n");
-    const classifyPrompt = `Given these content pillars:\n${pillarDescriptions}\n\nWhich pillar best fits this topic?\nTopic: "${topic}"\nReply with only the pillar ID.`;
-    const raw = await generator.chat(
-      [{ role: "user", content: classifyPrompt }],
-      { temperature: 0.0 }
-    );
-    const trimmed = raw.trim();
-    const validIds = persona.contentPillars.map((p) => p.id);
-    if (validIds.includes(trimmed)) {
-      resolvedPillarId = trimmed;
-    }
-  }
-
-  console.log(`Pillar: ${resolvedPillarId} | Topic: ${topic}`);
+  console.log(`Generating ${postType} post: "${topic}"`);
 
   const variants = await generator.generateVariants(
-    { pillarId: resolvedPillarId, topic },
+    { topic, hook, postType, tomorrowTheme },
     3
   );
 

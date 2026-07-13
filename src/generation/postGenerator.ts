@@ -1,17 +1,22 @@
 import { NvidiaClient } from "./nvidiaClient";
 import { buildSystemPrompt, buildUserPrompt } from "./promptBuilder";
 import { processPost, ProcessedPost } from "./postProcessor";
-import { persona, ContentPillar } from "../config/persona";
+import { persona } from "../config/persona";
+import { PostType, getTemplate } from "../config/templates";
 
 export interface GeneratePostRequest {
-  pillarId: string;
   topic: string;
+  hook: string;
+  postType: PostType;
+  tomorrowTheme?: string;
   extraContext?: string;
   temperature?: number;
 }
 
 export interface GeneratePostResult extends ProcessedPost {
-  pillarId: string;
+  day: number;
+  postType: PostType;
+  hook: string;
   topic: string;
   model: string;
   generatedAt: string;
@@ -26,20 +31,16 @@ export class PostGenerator {
     this.model = model;
   }
 
-  private resolvePillar(pillarId: string): ContentPillar {
-    const pillar = persona.contentPillars.find((p) => p.id === pillarId);
-    if (!pillar) {
-      const validIds = persona.contentPillars.map((p) => p.id).join(", ");
-      throw new Error(`Unknown pillarId "${pillarId}". Valid options: ${validIds}`);
-    }
-    return pillar;
-  }
-
   async generate(req: GeneratePostRequest): Promise<GeneratePostResult> {
-    const pillar = this.resolvePillar(req.pillarId);
-
+    const template = getTemplate(req.postType);
     const systemPrompt = buildSystemPrompt();
-    const userPrompt = buildUserPrompt(pillar, req.topic, req.extraContext);
+    const userPrompt = buildUserPrompt(
+      req.topic,
+      req.hook,
+      template,
+      req.tomorrowTheme,
+      req.extraContext
+    );
 
     const raw = await this.client.chat(
       [
@@ -53,7 +54,9 @@ export class PostGenerator {
 
     return {
       ...processed,
-      pillarId: pillar.id,
+      day: 0,
+      postType: req.postType,
+      hook: req.hook,
       topic: req.topic,
       model: this.model,
       generatedAt: new Date().toISOString(),
