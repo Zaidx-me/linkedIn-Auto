@@ -2,6 +2,7 @@ node_modules/
 dist/
 data/chrome_profile/
 data/*.tar.gz
+data/posts.db
 .superpowers/
 .env
 *.log

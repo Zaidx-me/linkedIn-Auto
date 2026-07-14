@@ -35,11 +35,18 @@ export class PostStore {
 
     const SQL = await initSqlJs();
     if (fs.existsSync(this.dbPath)) {
-      const buffer = fs.readFileSync(this.dbPath);
-      this.db = new SQL.Database(buffer);
-
-      // Migrate: add new columns if they don't exist
-      this.migrate();
+      try {
+        const buffer = fs.readFileSync(this.dbPath);
+        this.db = new SQL.Database(buffer);
+        // Verify the DB is readable
+        this.db.exec("SELECT 1 FROM posts LIMIT 0");
+        this.migrate();
+      } catch (err: any) {
+        console.error(`[PostStore] Database corrupted, recreating: ${err.message}`);
+        try { this.db?.close(); } catch (_) {}
+        fs.unlinkSync(this.dbPath);
+        this.db = new SQL.Database();
+      }
     } else {
       this.db = new SQL.Database();
     }
