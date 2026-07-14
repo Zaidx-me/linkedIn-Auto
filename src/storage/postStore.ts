@@ -78,10 +78,31 @@ export class PostStore {
 
   private migrate() {
     if (!this.db) return;
-    // Check if new columns exist, add them if not
     const cols = this.db.exec("PRAGMA table_info(posts)");
     if (cols.length > 0) {
-      const columnNames = cols[0].values.map((r) => r[1]);
+      const columnNames = cols[0].values.map((r) => r[1] as string);
+      // Old schema had pillarId NOT NULL — drop and recreate
+      if (columnNames.includes("pillarId")) {
+        console.log("[PostStore] Migrating: dropping old schema with pillarId column");
+        this.db.run("DROP TABLE posts");
+        this.db.run(`
+          CREATE TABLE posts (
+            id INTEGER PRIMARY KEY,
+            day INTEGER NOT NULL DEFAULT 0,
+            postType TEXT NOT NULL DEFAULT 'lesson',
+            hook TEXT NOT NULL DEFAULT '',
+            topic TEXT NOT NULL,
+            text TEXT NOT NULL,
+            charCount INTEGER NOT NULL,
+            hashtags TEXT NOT NULL,
+            model TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending_review',
+            generatedAt TEXT NOT NULL,
+            publishedAt TEXT
+          );
+        `);
+        return;
+      }
       if (!columnNames.includes("day")) {
         this.db.run("ALTER TABLE posts ADD COLUMN day INTEGER NOT NULL DEFAULT 0");
       }
