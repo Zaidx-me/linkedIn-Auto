@@ -1,6 +1,3 @@
-import fs from "fs";
-import path from "path";
-
 export interface CalendarDay {
   day: number;
   theme: string;
@@ -8,32 +5,53 @@ export interface CalendarDay {
   week: number;
 }
 
-const CALENDAR_FILE = path.resolve(process.cwd(), "data/calendar.json");
-
-let cachedCalendar: CalendarDay[] | null = null;
+const CALENDAR: CalendarDay[] = [
+  { day: 1, theme: "Why communication matters", hook: "Intelligence is entirely useless if you can't articulate your thoughts.", week: 1 },
+  { day: 2, theme: "Clarity", hook: "Stop dumbing things down. You're just insulting your clients' intelligence.", week: 1 },
+  { day: 3, theme: "Simplify ideas", hook: "If it takes 3 paragraphs to explain your remote graphic design workflow, you don't understand it yourself.", week: 1 },
+  { day: 4, theme: "Structure thoughts", hook: "'Thinking out loud' in meetings is highly unprofessional.", week: 1 },
+  { day: 5, theme: "Ask better questions", hook: "'There are no stupid questions' is a lie told by bad managers.", week: 1 },
+  { day: 6, theme: "Active listening", hook: "You aren't listening, you're just aggressively waiting for your turn to speak.", week: 1 },
+  { day: 7, theme: "Weekly review", hook: "Most communication advice on LinkedIn will actively ruin your career.", week: 1 },
+  { day: 8, theme: "Confidence", hook: "Forced humility is killing your earning potential.", week: 2 },
+  { day: 9, theme: "Managing nerves", hook: "If you're nervous before a presentation, you just didn't prepare enough.", week: 2 },
+  { day: 10, theme: "Credible language", hook: "Stop using 'I think' and 'maybe' in emails. It makes you look weak.", week: 2 },
+  { day: 11, theme: "Body language", hook: "Your passive posture is exactly why you aren't closing high-paying deals.", week: 2 },
+  { day: 12, theme: "Disagree respectfully", hook: "Agreeing with your boss all the time makes you entirely replaceable.", week: 2 },
+  { day: 13, theme: "Constructive feedback", hook: "The 'compliment sandwich' is insulting and manipulative.", week: 2 },
+  { day: 14, theme: "Weekly review", hook: "Stop reading self-help books and start having difficult conversations.", week: 2 },
+  { day: 15, theme: "First impressions", hook: "Nobody cares about your resume; they judge you in the first 3 seconds.", week: 3 },
+  { day: 16, theme: "Starting conversations", hook: "Small talk is a massive waste of time for high performers.", week: 3 },
+  { day: 17, theme: "Networking", hook: "Forced networking events are for people who can't do actual, deep work.", week: 3 },
+  { day: 18, theme: "Professional messages", hook: "'Hope this finds you well' is the fastest way to get your email deleted.", week: 3 },
+  { day: 19, theme: "Follow-ups", hook: "If they didn't reply, they saw it. You're just being annoying.", week: 3 },
+  { day: 20, theme: "Building trust", hook: "Trust isn't earned over time; it is strictly manufactured through competence.", week: 3 },
+  { day: 21, theme: "Weekly review", hook: "Your professional network is completely useless if you lack leverage.", week: 3 },
+  { day: 22, theme: "Storytelling", hook: "Stop telling your 'authentic' sob story on LinkedIn.", week: 4 },
+  { day: 23, theme: "Persuasion", hook: "Cold logic will never win an argument against human ego.", week: 4 },
+  { day: 24, theme: "Explain complexity", hook: "If your team is confused about the strategy, it is 100% your fault.", week: 4 },
+  { day: 25, theme: "Communicate under pressure", hook: "Apologizing immediately when you make a mistake is a terrible strategy.", week: 4 },
+  { day: 26, theme: "Lead meetings", hook: "90% of meetings could be an email, and the person calling them is incompetent.", week: 4 },
+  { day: 27, theme: "Conflict resolution", hook: "Embracing workplace conflict is much better than forced harmony.", week: 4 },
+  { day: 28, theme: "Influence", hook: "You do not need a management title to manipulate a team's direction.", week: 4 },
+  { day: 29, theme: "Reflection", hook: "Most of you completely failed this 30-day challenge.", week: 5 },
+  { day: 30, theme: "Graduation", hook: "Communication is a weapon. Stop treating it like a soft skill.", week: 5 },
+];
 
 export function loadCalendar(): CalendarDay[] {
-  if (cachedCalendar) return cachedCalendar;
-  if (!fs.existsSync(CALENDAR_FILE)) {
-    throw new Error(`Calendar file not found at ${CALENDAR_FILE}`);
-  }
-  const parsed: CalendarDay[] = JSON.parse(fs.readFileSync(CALENDAR_FILE, "utf-8"));
-  cachedCalendar = parsed;
-  return parsed;
+  return CALENDAR;
 }
 
 export function getDay(dayIndex: number): CalendarDay {
-  const calendar = loadCalendar();
-  if (dayIndex < 0 || dayIndex >= calendar.length) {
-    throw new Error(`Invalid day index ${dayIndex}. Valid range: 0-${calendar.length - 1}`);
+  if (dayIndex < 0 || dayIndex >= CALENDAR.length) {
+    throw new Error(`Invalid day index ${dayIndex}. Valid range: 0-${CALENDAR.length - 1}`);
   }
-  return calendar[dayIndex];
+  return CALENDAR[dayIndex];
 }
 
 export function getNextTheme(currentDayIndex: number): string | undefined {
-  const calendar = loadCalendar();
-  if (currentDayIndex + 1 < calendar.length) {
-    return calendar[currentDayIndex + 1].theme;
+  if (currentDayIndex + 1 < CALENDAR.length) {
+    return CALENDAR[currentDayIndex + 1].theme;
   }
   return undefined;
 }
