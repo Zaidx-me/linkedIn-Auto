@@ -74,11 +74,11 @@ export class PostGenerator {
 
   /** Generate multiple variants of the same topic so you can pick the best one. */
   async generateVariants(req: GeneratePostRequest, count: number): Promise<GeneratePostResult[]> {
-    const results: GeneratePostResult[] = [];
-    for (let i = 0; i < count; i++) {
-      // Slight temperature bump per variant for more spread
-      results.push(await this.generate({ ...req, temperature: 0.6 + i * 0.15 }));
-    }
-    return results;
+    const temps = [0.6, 0.75, 0.9];
+    return Promise.all(
+      Array.from({ length: count }, (_, i) =>
+        this.generate({ ...req, temperature: temps[i] ?? 0.7 })
+      )
+    );
   }
 }
