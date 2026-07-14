@@ -11,7 +11,7 @@
     "start:dev": "tsx src/server.ts",
     "start:quick": "node dist/server.js",
     "auth:login": "tsx src/auth/login.ts",
-    "schedule": "tsx src/scheduler/scheduler.ts"
+    "schedule": "npm run build && node dist/scheduler/scheduler.js"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
