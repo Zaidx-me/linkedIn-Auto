@@ -69,6 +69,7 @@ async function postOnce(
       topic: calendarDay.theme,
       hook: calendarDay.hook,
       postType,
+      day: calendarDay.day,
       tomorrowTheme,
     },
     3
@@ -101,6 +102,7 @@ async function postOnce(
         topic: calendarDay.theme,
         hook: calendarDay.hook,
         postType,
+        day: calendarDay.day,
         tomorrowTheme,
         temperature: retryTemp,
       });

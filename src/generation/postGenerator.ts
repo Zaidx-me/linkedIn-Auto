@@ -8,6 +8,7 @@ export interface GeneratePostRequest {
   topic: string;
   hook: string;
   postType: PostType;
+  day?: number;
   tomorrowTheme?: string;
   extraContext?: string;
   temperature?: number;
@@ -54,7 +55,7 @@ export class PostGenerator {
 
     return {
       ...processed,
-      day: 0,
+      day: req.day ?? 0,
       postType: req.postType,
       hook: req.hook,
       topic: req.topic,
