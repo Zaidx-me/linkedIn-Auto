@@ -32,11 +32,29 @@ interface Progress {
   done: boolean;
 }
 
+const DEFAULT_PROGRESS: Progress = { dayIndex: 0, postTypeIndex: 0, lastPostTime: null, done: false };
+
 function loadProgress(): Progress {
-  if (fs.existsSync(PROGRESS_FILE)) {
-    return JSON.parse(fs.readFileSync(PROGRESS_FILE, "utf-8"));
+  const fallback = { ...DEFAULT_PROGRESS };
+  if (!fs.existsSync(PROGRESS_FILE)) {
+    return fallback;
   }
-  return { dayIndex: 0, postTypeIndex: 0, lastPostTime: null, done: false };
+  try {
+    const raw = JSON.parse(fs.readFileSync(PROGRESS_FILE, "utf-8"));
+    if (typeof raw.dayIndex !== "number" || typeof raw.postTypeIndex !== "number") {
+      console.warn(`[scheduler] Progress file has invalid fields, resetting to defaults`);
+      return fallback;
+    }
+    return {
+      dayIndex: raw.dayIndex,
+      postTypeIndex: raw.postTypeIndex,
+      lastPostTime: raw.lastPostTime ?? null,
+      done: raw.done === true,
+    };
+  } catch (err: any) {
+    console.warn(`[scheduler] Failed to parse progress file: ${err.message}. Using defaults.`);
+    return fallback;
+  }
 }
 
 function saveProgress(p: Progress) {
