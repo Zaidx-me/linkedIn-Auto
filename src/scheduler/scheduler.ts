@@ -137,6 +137,22 @@ async function postOnce(
   return true;
 }
 
+let shutdownRequested = false;
+
+function setupGracefulShutdown(store: PostStore) {
+  const shutdown = (signal: string) => {
+    console.log(`\n[scheduler] ${signal} received. Shutting down gracefully...`);
+    shutdownRequested = true;
+    try {
+      store.close();
+      console.log("[scheduler] Database closed.");
+    } catch {}
+    process.exit(0);
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
 async function main() {
   console.log("========================================");
   console.log("  LinkedIn Auto Scheduler");
@@ -144,6 +160,8 @@ async function main() {
   console.log(`  Spacing: ${INTERVAL_MS / (60 * 60 * 1000)}h between posts`);
   console.log(`  Quality threshold: ${QUALITY_THRESHOLD}/10`);
   console.log("========================================\n");
+
+  console.log("[scheduler] Initializing...");
 
   // Validate calendar
   const calendar = loadCalendar();
@@ -153,11 +171,30 @@ async function main() {
   }
   console.log(`[scheduler] Loaded ${calendar.length} calendar days`);
 
+  if (!NVIDIA_API_KEY) {
+    console.error("[scheduler] NVIDIA_API_KEY is not set. Copy .env.example to .env and add your key.");
+    process.exit(1);
+  }
+  console.log("[scheduler] NVIDIA API key configured");
+
+  console.log("[scheduler] Creating PostGenerator...");
   const generator = new PostGenerator(NVIDIA_API_KEY, NVIDIA_MODEL);
+  console.log("[scheduler] PostGenerator created");
+
+  console.log("[scheduler] Creating PostStore...");
   const store = new PostStore(DB_PATH);
+  console.log("[scheduler] Initializing database...");
   await store.init();
+  console.log("[scheduler] Database initialized");
+
+  setupGracefulShutdown(store);
+
+  console.log("[scheduler] Creating Publisher...");
   const publisher = new Publisher();
+  console.log("[scheduler] Publisher created");
+
   const progress = loadProgress();
+  console.log(`[scheduler] Progress loaded: dayIndex=${progress.dayIndex}, postTypeIndex=${progress.postTypeIndex}`);
 
   if (progress.done) {
     console.log("[scheduler] Schedule already complete. Delete data/schedule-progress.json to restart.");
@@ -165,10 +202,12 @@ async function main() {
   }
 
   const completedPosts =
-    progress.dayIndex * POSTS_PER_DAY + progress.postTypeIndex;
-  console.log(`[scheduler] ${TOTAL_POSTS - completedPosts} posts remaining\n`);
+    (typeof progress.dayIndex === "number" ? progress.dayIndex : 0) * POSTS_PER_DAY +
+    (typeof progress.postTypeIndex === "number" ? progress.postTypeIndex : 0);
+  const remaining = TOTAL_POSTS - completedPosts;
+  console.log(`[scheduler] ${Number.isFinite(remaining) ? remaining : TOTAL_POSTS} posts remaining\n`);
 
-  while (progress.dayIndex < TOTAL_DAYS) {
+  while (progress.dayIndex < TOTAL_DAYS && !shutdownRequested) {
     try {
       await postOnce(generator, store, publisher, progress.dayIndex, progress.postTypeIndex);
 
@@ -200,19 +239,27 @@ async function main() {
         console.error(`[scheduler] CAPTCHA blocked. Run 'npm run auth:login' then restart.`);
         process.exit(3);
       }
-      console.error(`[scheduler] Failed: ${err.message}. Retrying in 30 min...`);
+      console.error(`[scheduler] Failed: ${err.message}`);
+      if (err.stack) console.error(`[scheduler] Stack: ${err.stack}`);
+      console.error(`[scheduler] Retrying in ${RETRY_INTERVAL_MS / 60000} min...`);
       await sleep(RETRY_INTERVAL_MS);
       continue;
     }
+
+    if (shutdownRequested) break;
 
     const nextPost = new Date(Date.now() + INTERVAL_MS);
     console.log(`[scheduler] Next post at ${nextPost.toLocaleString()}`);
     console.log(`[scheduler] Waiting ${INTERVAL_MS / (60 * 60 * 1000)}h...\n`);
     await sleep(INTERVAL_MS);
   }
+
+  console.log("[scheduler] Scheduler loop ended.");
+  try { store.close(); } catch {}
 }
 
 main().catch((err) => {
   console.error(`[scheduler] Fatal: ${err.message}`);
+  if (err.stack) console.error(`[scheduler] Stack: ${err.stack}`);
   process.exit(1);
 });

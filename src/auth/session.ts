@@ -167,7 +167,8 @@ export class SessionManager {
         }
         console.log("[publisher] Re-authenticated with credentials");
       }
-      if (url.includes("checkpoint") || url.includes("challenge")) {
+      const afterUrl = page.url();
+      if (afterUrl.includes("checkpoint") || afterUrl.includes("challenge")) {
         if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
         const screenshotPath = path.join(DATA_DIR, `captcha-${Date.now()}.png`);
         await page.screenshot({ path: screenshotPath });
@@ -176,7 +177,8 @@ export class SessionManager {
     } catch (err) {
       if (context) await context.close().catch(() => {});
       if (err instanceof CaptchaBlockedError) throw err;
-      throw new Error(`Session invalid — run 'npm run auth:login' to re-authenticate.`);
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Session invalid — run 'npm run auth:login' to re-authenticate. (${msg})`);
     }
     await context.close();
   }
